@@ -31,6 +31,13 @@ export default function CylinderMenuScreen() {
             onPress={() => router.push('/cylinders/parties')}
           />
           <MenuLinkCard
+            icon="warning-triangle"
+            iconSize={{ width: 26, height: 23 }}
+            title="Outstanding Report"
+            description="See which parties still hold cylinders and how long they've had them."
+            onPress={() => router.push('/cylinders/outstanding')}
+          />
+          <MenuLinkCard
             icon="transaction-plus"
             iconSize={{ width: 25, height: 25 }}
             title="New Transaction"

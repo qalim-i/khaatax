@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { startOfMonthIso } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
 
@@ -7,11 +8,6 @@ export interface PartyLedgerRow {
   party: Party;
   filledSentMtd: number;
   emptyReceivedMtd: number;
-}
-
-function startOfMonthIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
 
 export function usePartyLedger() {

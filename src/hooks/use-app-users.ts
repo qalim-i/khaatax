@@ -1,0 +1,34 @@
+import { useEffect, useState } from 'react';
+
+import { supabase } from '@/lib/supabase';
+import type { AppUser } from '@/types/db';
+
+/**
+ * The fixed staff list (1 owner + 2-3 managers), used to resolve `created_by`
+ * ids to names and to populate the "logged by" filter. Small and stable enough
+ * to fetch whole and match in memory rather than joining on every list query.
+ *
+ * Requires the `read_all_users` policy from migration 0004; without it this
+ * returns only the signed-in user.
+ */
+export function useAppUsers() {
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('users')
+      .select('*')
+      .order('name')
+      .then(({ data }) => {
+        setUsers((data as AppUser[]) ?? []);
+        setLoading(false);
+      });
+  }, []);
+
+  function nameFor(userId: string): string {
+    return users.find((u) => u.id === userId)?.name ?? 'Unknown';
+  }
+
+  return { users, loading, nameFor };
+}

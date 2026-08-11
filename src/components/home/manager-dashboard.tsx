@@ -5,10 +5,7 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useRecentActivity } from '@/hooks/use-recent-activity';
-
-function formatCurrency(amount: number) {
-  return `$${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-}
+import { formatCurrency } from '@/lib/format';
 
 const activityIcon: Record<string, IconName> = {
   dispatch: 'truck',
@@ -72,7 +69,7 @@ export function ManagerDashboard() {
             <Icon name="plus-circle" width={20} height={20} color={colors.white} />
             <Text style={[styles.actionLabel, { color: colors.white }]}>New Order</Text>
           </Pressable>
-          <Pressable style={[styles.actionButton, styles.actionSecondary]} onPress={() => router.push('/expenses')}>
+          <Pressable style={[styles.actionButton, styles.actionSecondary]} onPress={() => router.push('/expenses/new')}>
             <Icon name="clipboard-list" width={18} height={20} color={colors.primary} />
             <Text style={[styles.actionLabel, { color: colors.primary }]}>Record Expense</Text>
           </Pressable>

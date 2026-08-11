@@ -9,10 +9,7 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatTile } from '@/components/ui/stat-tile';
 import { colors, spacing, typography } from '@/constants/design-tokens';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
-
-function formatCurrency(amount: number) {
-  return `$${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-}
+import { formatCurrency } from '@/lib/format';
 
 export function OwnerDashboard() {
   const { data, loading } = useHomeDashboard(true);
@@ -44,7 +41,12 @@ export function OwnerDashboard() {
       </Card>
 
       <Card>
-        <SectionHeader icon={<Icon name="wallet" width={22} height={16} color={colors.textPrimary} />} title="Expense MTD" />
+        <SectionHeader
+          icon={<Icon name="wallet" width={22} height={16} color={colors.textPrimary} />}
+          title="Expense MTD"
+          actionLabel="View All"
+          onActionPress={() => router.push('/expenses')}
+        />
         <View>
           <Text style={styles.bigStat}>{loading ? '—' : formatCurrency(data?.expenseMtd ?? 0)}</Text>
         </View>
@@ -67,7 +69,7 @@ export function OwnerDashboard() {
         <SectionHeader icon={<Icon name="bolt" width={16} height={20} color={colors.textPrimary} />} title="Quick Actions" />
         <View style={styles.actionsGrid}>
           <QuickActionButton icon="plus-circle" label="New Order" onPress={() => router.push('/cylinders/new-transaction')} />
-          <QuickActionButton icon="clipboard-list" label="Record Expense" onPress={() => router.push('/expenses')} />
+          <QuickActionButton icon="clipboard-list" label="Record Expense" onPress={() => router.push('/expenses/new')} />
           <QuickActionButton icon="truck" label="Dispatch" onPress={() => router.push('/cylinders/new-transaction')} />
           <QuickActionButton icon="inventory-audit" label="Inventory Audit" onPress={() => router.push('/cylinders/stock')} />
         </View>

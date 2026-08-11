@@ -23,8 +23,16 @@ This document specifies the technical requirements needed to implement KhaataX a
 | Shared code | TypeScript monorepo (e.g. Turborepo or Nx) with a shared package for types, API client, and business logic used by both clients |
 | Backend | Supabase: PostgreSQL, Auth, auto-generated REST + Realtime API |
 | Database | PostgreSQL, single schema, no multi-tenant partitioning required |
-| Charting | Recharts (web), Victory Native (mobile) |
+| Charting | Recharts (web), Victory Native (mobile) — see note below |
 | PDF generation | Server-side generation (Supabase Edge Function or equivalent) for Invoice/DC/report documents |
+
+> **Charting deviation (Phase 2, decided during implementation).** The mobile
+> Expense Dashboard charts are drawn with `react-native-svg`, which the app
+> already depends on, rather than Victory Native. Victory Native requires
+> `@shopify/react-native-skia`, a native module that would force a dev-client /
+> EAS rebuild for two charts — a rolling 12-month bar trend and a ranked category
+> breakdown — neither of which needs a charting engine. Revisit if a later phase
+> needs interactive or composed charts. The web client's Recharts choice stands.
 
 ## 3. Data Model Requirements
 
@@ -120,11 +128,17 @@ Exactly two application roles: `owner` and `manager`, stored on the `users` tabl
 
 | Table | Owner | Manager |
 |---|---|---|
+| users | SELECT | SELECT |
 | parties | SELECT/INSERT/UPDATE/DELETE | SELECT/INSERT/UPDATE/DELETE |
 | transactions | SELECT/INSERT/UPDATE/DELETE | SELECT/INSERT/UPDATE/DELETE |
 | stock | SELECT/UPDATE | SELECT/UPDATE |
 | expenses | SELECT/INSERT/UPDATE/DELETE | SELECT/INSERT/UPDATE/DELETE |
 | employees | SELECT/INSERT/UPDATE/DELETE | No access (denied by policy) |
+
+`users` is read-only to both roles and holds only id, name and role — it backs the
+expense list's "logged by" column and filter (EXP-5). No compensation data lives
+there; pay is in `employees`, which remains owner-only. Neither role may write to
+`users`; accounts are provisioned by the developer (Section 5.3).
 
 Example RLS policy required on `employees`:
 

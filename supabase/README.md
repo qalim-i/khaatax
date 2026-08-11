@@ -11,6 +11,7 @@ In the Supabase dashboard's **SQL Editor**, run the files in `migrations/` **in 
 1. `0001_initial_schema.sql` — tables, sequences, RLS policies
 2. `0002_create_transaction_function.sql` — the atomic New Transaction RPC
 3. `0003_role_claim_hook.sql` — the function that projects `role` onto the JWT
+4. `0004_expense_reporting.sql` — staff-directory read policy on `users`, plus reporting indexes
 
 ## 3. Enable the Custom Access Token Hook
 

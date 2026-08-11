@@ -68,9 +68,13 @@ If a task seems to require any of the above, stop and ask rather than implementi
 
 ## Current Phase
 
-**Phase 1** (build this first): Home Dashboard, Party Ledger, New Transaction, Stock Summary.
+**Phase 3** (next): Payroll (Employee List + Summary) and the owner-only web view.
 
-Later phases (do not start until Phase 1 is working): Outstanding Report + Expense module (Phase 2), Payroll + owner web view (Phase 3), PDF export + polish (Phase 4). Full breakdown in PRD.md Section 8.
+Done: Phase 1 (Home Dashboard, Party Ledger, New Transaction, Stock Summary) and Phase 2 (Outstanding Report, Expense Dashboard, Add Expense, Expense List).
+
+Remaining after Phase 3: PDF export for Invoice/DC/reports, polish (Phase 4). Full breakdown in PRD.md Section 8.
+
+Phase 3 is the first phase to touch `employees` — re-read Non-Negotiable Rule 1 before starting it.
 
 ## When Unsure
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { startOfMonthIso } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
 import type { Stock } from '@/types/db';
 
@@ -9,11 +10,6 @@ export interface HomeDashboardData {
   outstanding: number;
   expenseMtd: number;
   payrollMonthlyTotal: number;
-}
-
-function startOfMonthIso(): string {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
 
 export function useHomeDashboard(includePayroll: boolean) {

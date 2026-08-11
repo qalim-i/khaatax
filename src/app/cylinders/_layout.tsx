@@ -6,6 +6,7 @@ export default function CylindersLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="stock" />
       <Stack.Screen name="new-transaction" />
+      <Stack.Screen name="outstanding" />
       <Stack.Screen name="parties/index" />
       <Stack.Screen name="parties/[id]" />
     </Stack>

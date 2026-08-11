@@ -86,3 +86,12 @@ export interface CreateTransactionResult {
   transaction: Transaction;
   party_balance: number;
 }
+
+// Input for logging an expense. `created_by` is stamped from the session by the
+// hook, not chosen by the caller.
+export interface CreateExpenseInput {
+  date: string;
+  amount: number;
+  category: ExpenseCategory;
+  note: string | null;
+}
