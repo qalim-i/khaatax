@@ -1,19 +1,20 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SelectField } from '@/components/ui/select-field';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useCreateExpense } from '@/hooks/use-create-expense';
 import { toIsoDate } from '@/lib/date';
+import { notify } from '@/lib/dialog';
 import { EXPENSE_CATEGORIES } from '@/lib/expense-categories';
 import { formatCurrency, formatDisplayDate } from '@/lib/format';
 import type { ExpenseCategory } from '@/types/db';
 
 export default function AddExpenseScreen() {
-  const { submit, submitting, error } = useCreateExpense();
+  const { submit, submitting } = useCreateExpense();
 
   const [category, setCategory] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
@@ -30,19 +31,20 @@ export default function AddExpenseScreen() {
   async function handleSubmit() {
     if (!category || !amountIsValid) return;
 
-    const result = await submit({
+    const { expense, error: failure } = await submit({
       date: toIsoDate(date),
       amount: parsedAmount,
       category: category as ExpenseCategory,
       note: note.trim() ? note.trim() : null,
     });
 
-    if (result) {
-      Alert.alert('Expense Logged', `${result.category} · ${formatCurrency(result.amount)}`, [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } else if (error) {
-      Alert.alert('Failed to log expense', error);
+    if (expense) {
+      // Navigate unconditionally rather than from a dialog callback — the row is
+      // already written, so the screen must not depend on the dialog to leave.
+      notify('Expense Logged', `${expense.category} · ${formatCurrency(expense.amount)}`);
+      router.back();
+    } else {
+      notify('Failed to log expense', failure ?? 'The expense could not be saved.');
     }
   }
 

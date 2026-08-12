@@ -124,6 +124,14 @@ select nextval('dc_no_seq');        -- assigned to transactions.dc_no
 
 Exactly two application roles: `owner` and `manager`, stored on the `users` table and included in the Supabase Auth JWT as a custom claim used by RLS policies.
 
+> **The claim is `app_role`, not `role`.** `role` is reserved by Supabase Auth for
+> the Postgres role PostgREST assumes (`authenticated` / `anon`); the Custom Access
+> Token Hook cannot overwrite it, and a successful overwrite would break PostgREST
+> anyway by making it `SET ROLE owner`. An early implementation used `role` and the
+> result was that `auth.jwt() ->> 'role'` stayed `authenticated`, so **every policy
+> denied every user** — reads returned zero rows silently, writes failed with an RLS
+> violation. Fixed in migration `0005`. Policies must test `auth.jwt() ->> 'app_role'`.
+
 ### 5.2 Row-Level Security Policies (required, by table)
 
 | Table | Owner | Manager |
@@ -217,6 +225,11 @@ This must run as a single atomic operation (database transaction) so a failure p
 | Integration tests | Concurrent transaction creation does not produce duplicate or out-of-order `invoice_no`/`dc_no` values |
 | Manual QA | Full screen-by-screen pass for both Owner and Manager roles, confirming Payroll is fully absent (UI and network requests) for Manager |
 | Regression | Re-run RLS and numbering tests on every schema migration |
+
+Implemented as of Phase 3: `npm test` runs the unit suites (aging/FIFO, date
+boundaries, payroll aggregation); `npm run test:rls` runs the `employees`
+boundary test in `tests/rls-employees.test.ts` against a live project. The
+concurrency test for `invoice_no`/`dc_no` is **not yet written**.
 
 ## 10. Technical Risks & Mitigations
 

@@ -14,13 +14,17 @@ import type { AppUser } from '@/types/db';
 export function useAppUsers() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from('users')
       .select('*')
       .order('name')
-      .then(({ data }) => {
+      .then(({ data, error: fetchError }) => {
+        // Silently dropping this made every name resolve to 'Unknown' with no
+        // indication that the lookup had failed rather than come back empty.
+        setError(fetchError ? fetchError.message : null);
         setUsers((data as AppUser[]) ?? []);
         setLoading(false);
       });
@@ -30,5 +34,5 @@ export function useAppUsers() {
     return users.find((u) => u.id === userId)?.name ?? 'Unknown';
   }
 
-  return { users, loading, nameFor };
+  return { users, loading, error, nameFor };
 }

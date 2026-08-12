@@ -9,20 +9,33 @@ import type { CreateExpenseInput, Expense } from '@/types/db';
  * session here; unlike invoice/DC numbers there is no sequence to protect, so no
  * server-side function is needed.
  */
+export interface CreateExpenseResult {
+  expense: Expense | null;
+  error: string | null;
+}
+
 export function useCreateExpense() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(input: CreateExpenseInput): Promise<Expense | null> {
+  /**
+   * Returns the failure message alongside the row rather than leaving the caller
+   * to read `error` off this hook. A caller that reads hook state inside the same
+   * callback that triggered the save sees the *previous* render's value — which
+   * is null on the first attempt, so the first failure produced no message at
+   * all. Returning it removes that trap.
+   */
+  async function submit(input: CreateExpenseInput): Promise<CreateExpenseResult> {
     setSubmitting(true);
     setError(null);
 
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData.user?.id;
     if (!userId) {
-      setError('You are signed out. Sign in again to log an expense.');
+      const message = 'You are signed out. Sign in again to log an expense.';
+      setError(message);
       setSubmitting(false);
-      return null;
+      return { expense: null, error: message };
     }
 
     const { data, error: insertError } = await supabase
@@ -34,9 +47,9 @@ export function useCreateExpense() {
     setSubmitting(false);
     if (insertError) {
       setError(insertError.message);
-      return null;
+      return { expense: null, error: insertError.message };
     }
-    return data as Expense;
+    return { expense: data as Expense, error: null };
   }
 
   return { submit, submitting, error };

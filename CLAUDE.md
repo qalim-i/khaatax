@@ -68,13 +68,33 @@ If a task seems to require any of the above, stop and ask rather than implementi
 
 ## Current Phase
 
-**Phase 3** (next): Payroll (Employee List + Summary) and the owner-only web view.
+**Phase 4** (done): PDF export for Invoice/DC via `expo-print`, OS share sheet for WhatsApp/SMS, and an error-surfacing polish pass. Full breakdown in PRD.md Section 8.
 
-Done: Phase 1 (Home Dashboard, Party Ledger, New Transaction, Stock Summary) and Phase 2 (Outstanding Report, Expense Dashboard, Add Expense, Expense List).
+Done: Phase 1 (Home Dashboard, Party Ledger, New Transaction, Stock Summary), Phase 2 (Outstanding Report, Expense Dashboard, Add Expense, Expense List), Phase 3 mobile (Payroll Employee List + Summary, owner-only), Phase 4 (Invoice/DC PDF export + polish).
 
-Remaining after Phase 3: PDF export for Invoice/DC/reports, polish (Phase 4). Full breakdown in PRD.md Section 8.
+Also added outside the original phase plan: party creation (Add Party on the Party Ledger). The PRD has no story for it — INV-1…INV-6 all assume parties exist — so until Phase 4 the only way to create one was via the Supabase dashboard.
 
-Phase 3 is the first phase to touch `employees` — re-read Non-Negotiable Rule 1 before starting it.
+**Resolved since the last update:**
+- Migration `0005_fix_role_claim.sql` and `0006_auth_admin_reads_roles.sql` are applied and the Custom Access Token Hook is enabled. `app_role` reaches the JWT and role-based policies evaluate correctly.
+- **The payroll boundary is proven.** `npm run test:rls` is fully green (9/9), including the three owner-side controls that previously failed. The manager-denial assertions are now meaningful rather than vacuous.
+
+**Still outstanding:**
+- The owner web view (PRD GEN-3) was deliberately deferred — not built. This is the last unbuilt "Should" in the PRD.
+- PDF export covers Invoice and Delivery Challan only (PRD INV-5). Stock-summary and report exports were considered in Phase 4 and left out — no PRD story calls for them. The Export button on the Stock screen says so rather than promising one.
+
+## PDF Export
+
+- Documents are defined in `src/lib/pdf/documents.ts` as pure HTML-string builders — no Expo or React imports, so they are unit-tested (`documents.test.ts`) and reusable by a future web client.
+- Rendering and sharing live in `src/hooks/use-export-pdf.ts`, the only file that touches the device.
+- **This deviates from SAD.md Section 7**, which originally specified a server-side Supabase Edge Function. The deviation and its rationale are recorded in SAD.md itself. If you add a second client, revisit that decision rather than duplicating the template.
+- Invoice and DC numbers come from independent sequences and do not match. Never render one where the other belongs; `documents.test.ts` guards this.
+
+## Testing
+
+- `npm test` — unit tests (pure logic in `src/lib`). No database, no credentials.
+- `npm run test:rls` — payroll RLS boundary against a real Supabase project. Requires the `KHAATAX_TEST_*` credentials in `.env.example`. Fails loudly rather than skipping when they're absent, by design.
+
+Any change touching `employees` must re-run `test:rls` (Non-Negotiable Rule 1).
 
 ## When Unsure
 

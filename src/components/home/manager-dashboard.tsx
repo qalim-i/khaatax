@@ -1,10 +1,13 @@
 import { router } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
 import { useRecentActivity } from '@/hooks/use-recent-activity';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 import { formatCurrency } from '@/lib/format';
 
 const activityIcon: Record<string, IconName> = {
@@ -14,8 +17,15 @@ const activityIcon: Record<string, IconName> = {
 };
 
 export function ManagerDashboard() {
-  const { data, loading } = useHomeDashboard(false);
-  const { items, timeAgo } = useRecentActivity(3);
+  const { data, loading, error, refresh } = useHomeDashboard(false);
+  const { items, error: activityError, timeAgo, refresh: refreshActivity } = useRecentActivity(3);
+
+  const refreshAll = useCallback(() => {
+    refresh();
+    refreshActivity();
+  }, [refresh, refreshActivity]);
+
+  useRefreshOnFocus(refreshAll);
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -23,6 +33,9 @@ export function ManagerDashboard() {
         <Text style={styles.h1}>Good Morning, Manager</Text>
         <Text style={styles.subtitle}>Here is your daily operational overview.</Text>
       </View>
+
+      {/* Without this every tile reads 0 on a denied query, with nothing to say why. */}
+      <ErrorBanner message={error ?? activityError} />
 
       <View style={styles.kpiGrid}>
         <View style={styles.kpiCard}>

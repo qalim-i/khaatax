@@ -1,13 +1,15 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { SelectField } from '@/components/ui/select-field';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useCreateTransaction } from '@/hooks/use-create-transaction';
+import { notify } from '@/lib/dialog';
 import { useParties } from '@/hooks/use-parties';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 
 function formatDate(date: Date) {
   return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
@@ -18,8 +20,11 @@ function isoDate(date: Date) {
 }
 
 export default function NewTransactionScreen() {
-  const { parties, loading: partiesLoading } = useParties();
-  const { submit, submitting, error } = useCreateTransaction();
+  const { parties, loading: partiesLoading, refresh: refreshParties } = useParties();
+  const { submit, submitting } = useCreateTransaction();
+
+  // A party added on the Party Ledger screen must be selectable here on return.
+  useRefreshOnFocus(refreshParties);
 
   const [partyId, setPartyId] = useState<string | null>(null);
   const [date, setDate] = useState(new Date());
@@ -32,19 +37,18 @@ export default function NewTransactionScreen() {
 
   async function handleSubmit() {
     if (!partyId) return;
-    const result = await submit({
+    const { transaction, error: failure } = await submit({
       party_id: partyId,
       date: isoDate(date),
       cylinder_type: cylinderType.trim(),
       filled_sent: parseInt(filledSent, 10) || 0,
       empty_received: parseInt(emptyReceived, 10) || 0,
     });
-    if (result) {
-      Alert.alert('Transaction Recorded', `Invoice #${result.invoice_no} · DC #${result.dc_no}`, [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
-    } else if (error) {
-      Alert.alert('Failed to save transaction', error);
+    if (transaction) {
+      notify('Transaction Recorded', `Invoice #${transaction.invoice_no} · DC #${transaction.dc_no}`);
+      router.back();
+    } else {
+      notify('Failed to save transaction', failure ?? 'The transaction could not be saved.');
     }
   }
 

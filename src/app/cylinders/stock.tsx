@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AdjustStockModal } from '@/components/stock/adjust-stock-modal';
 import { StockTile } from '@/components/stock/stock-tile';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Icon } from '@/components/ui/icon';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, spacing, typography } from '@/constants/design-tokens';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 import { useStock } from '@/hooks/use-stock';
 import type { StockStatus } from '@/types/db';
 
@@ -69,7 +71,9 @@ const TILE_CONFIG: {
 ];
 
 export default function StockSummaryScreen() {
-  const { rows, loading, adjust, quantityOf } = useStock();
+  const { rows, loading, error, adjust, quantityOf, refresh } = useStock();
+
+  useRefreshOnFocus(refresh);
   const [modalVisible, setModalVisible] = useState(false);
 
   return (
@@ -81,19 +85,26 @@ export default function StockSummaryScreen() {
             <Text style={styles.h2}>Cylinder Inventory</Text>
             <Text style={styles.subtitle}>Real-time overview of current stock distribution.</Text>
           </View>
+          {/*
+            No Export button here by design. Phase 4 shipped PDF export for
+            Invoice and Delivery Challan only (PRD INV-5); a stock-summary export
+            was never in the PRD, and a button that only explains its own absence
+            is worse than no button. Invoice/DC PDFs live on Party Detail.
+          */}
           <View style={styles.headerActions}>
-            <Pressable
-              style={styles.exportButton}
-              onPress={() => Alert.alert('Export', 'PDF export lands in Phase 4.')}>
-              <Icon name="export" width={12} height={12} color={colors.textPrimary} />
-              <Text style={styles.exportLabel}>Export</Text>
-            </Pressable>
             <Pressable style={styles.receiveButton} onPress={() => setModalVisible(true)}>
               <Icon name="plus" width={10.5} height={10.5} color={colors.white} />
               <Text style={styles.receiveLabel}>Receive Stock</Text>
             </Pressable>
           </View>
         </View>
+
+        {/*
+          Covers both a denied read (tiles all show 0) and a denied adjustment,
+          which previously left the modal closing with nothing changed and no
+          explanation.
+        */}
+        <ErrorBanner message={error} />
 
         {!loading && rows.length === 0 ? (
           <Text style={styles.emptyState}>No stock rows found. Seed the `stock` table with the 5 canonical statuses.</Text>
@@ -153,22 +164,6 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: spacing.xs,
-  },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 2,
-    paddingVertical: spacing.xs + 1,
-    paddingHorizontal: spacing.sm + 1,
-    backgroundColor: colors.surface,
-  },
-  exportLabel: {
-    ...typography.body,
-    fontWeight: '500',
-    color: colors.textPrimary,
   },
   receiveButton: {
     flexDirection: 'row',

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Icon } from '@/components/ui/icon';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { QuickActionButton } from '@/components/ui/quick-action-button';
@@ -9,10 +10,13 @@ import { SectionHeader } from '@/components/ui/section-header';
 import { StatTile } from '@/components/ui/stat-tile';
 import { colors, spacing, typography } from '@/constants/design-tokens';
 import { useHomeDashboard } from '@/hooks/use-home-dashboard';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 import { formatCurrency } from '@/lib/format';
 
 export function OwnerDashboard() {
-  const { data, loading } = useHomeDashboard(true);
+  const { data, loading, error, refresh } = useHomeDashboard(true);
+
+  useRefreshOnFocus(refresh);
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -20,6 +24,9 @@ export function OwnerDashboard() {
         <Text style={styles.h2}>Overview</Text>
         <Text style={styles.subtitle}>Daily snapshot for KhaataX operations</Text>
       </View>
+
+      {/* Without this every tile reads 0 on a denied query, with nothing to say why. */}
+      <ErrorBanner message={error} />
 
       <Card>
         <SectionHeader
@@ -56,12 +63,14 @@ export function OwnerDashboard() {
         <SectionHeader
           icon={<Icon name="people" width={22} height={16} color={colors.textPrimary} />}
           title="Payroll Summary"
+          actionLabel="View All"
+          onActionPress={() => router.push('/more/payroll')}
         />
         <View>
           <Text style={styles.bigStat}>{loading ? '—' : formatCurrency(data?.payrollMonthlyTotal ?? 0)}</Text>
         </View>
         <View style={styles.payrollAction}>
-          <PrimaryButton label="Process Payroll" onPress={() => router.push('/more')} />
+          <PrimaryButton label="Manage Payroll" onPress={() => router.push('/more/payroll')} />
         </View>
       </Card>
 

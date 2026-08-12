@@ -9,6 +9,7 @@ import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useAppUsers } from '@/hooks/use-app-users';
 import { useExpenses } from '@/hooks/use-expenses';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 import { toIsoDate } from '@/lib/date';
 import { EXPENSE_CATEGORIES } from '@/lib/expense-categories';
 import { formatCurrency, formatDisplayDate } from '@/lib/format';
@@ -23,12 +24,14 @@ function firstParam(value: string | string[] | undefined): string | null {
 export default function ExpenseListScreen() {
   const params = useLocalSearchParams<{ category?: string; from?: string; to?: string }>();
   const { nameFor, users } = useAppUsers();
-  const { expenses, total, filters, setFilter, clearFilters, activeFilterCount, loading, error } =
+  const { expenses, total, filters, setFilter, clearFilters, activeFilterCount, loading, error, refresh } =
     useExpenses({
       category: firstParam(params.category),
       from: firstParam(params.from),
       to: firstParam(params.to),
     });
+
+  useRefreshOnFocus(refresh);
 
   const [picking, setPicking] = useState<'from' | 'to' | null>(null);
 
