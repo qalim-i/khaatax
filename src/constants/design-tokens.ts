@@ -12,6 +12,18 @@ export const colors = {
   textPrimary: '#161616',
   textSecondary: '#525252',
   primary: '#0F62FE',
+  /*
+    The wordmark green, used for the app title in the top bar and on sign-in so the
+    header ties back to the icon and the opening splash.
+
+    It is NOT one of the logo's own greens: those top out at 2.86:1 against the white
+    app bar, which fails WCAG AA. This is the same hue (152deg) walked down to 24%
+    lightness — 5.44:1 on `surface`, 4.95:1 on `background`, so it clears AA on both,
+    about where the blue `primary` already sat (5.00:1).
+  */
+  brand: '#007A41',
+  /* The icon and splash backdrop. Not a text colour — see `brand` for that. */
+  brandDeep: '#082722',
   success: '#198038',
   danger: '#DA1E28',
   warning: '#F1C21B',

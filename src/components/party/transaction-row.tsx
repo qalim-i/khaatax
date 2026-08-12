@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import type { TransactionWithRunningBalance } from '@/hooks/use-party-detail';
+import { formatCurrencyExact } from '@/lib/format';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -43,8 +44,16 @@ export function TransactionRow({ tx, onPress }: TransactionRowProps) {
       </View>
       <View style={styles.footerLine}>
         <Text style={styles.cylinderType}>{tx.cylinder_type}</Text>
-        {onPress ? <Text style={styles.exportHint}>Tap to export</Text> : null}
+        {/*
+          An em dash, not "₹0.00": transactions recorded before the amount field
+          existed all carry 0, and showing a price there would be a claim the
+          record does not support.
+        */}
+        <Text style={styles.amount}>
+          {tx.amount > 0 ? formatCurrencyExact(tx.amount) : '—'}
+        </Text>
       </View>
+      {onPress ? <Text style={styles.exportHint}>Tap to export</Text> : null}
     </Pressable>
   );
 }
@@ -102,9 +111,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textTransform: 'capitalize',
   },
+  amount: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
   exportHint: {
     ...typography.caption,
     color: colors.primary,
     fontWeight: '500',
+    textAlign: 'right',
   },
 });

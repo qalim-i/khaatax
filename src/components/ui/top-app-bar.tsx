@@ -75,6 +75,6 @@ const styles = StyleSheet.create({
   title: {
     ...typography.h1,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.brand,
   },
 });

@@ -50,6 +50,60 @@ In the Supabase dashboard's **SQL Editor**, run the files in `migrations/` **in 
    change**, or stock and validation failures will show generic fallback text instead
    of the specific reason. No sign-out needed.
 
+9. `0009_transaction_amount.sql` — **required.** Adds `transactions.amount`: the
+   rupee figure charged for a transaction, entered by hand on New Transaction and
+   printed on both the Invoice and the Delivery Challan.
+
+   * The column is `numeric(12,2) not null default 0`, so existing rows backfill
+     to 0. The documents print an em dash for a 0 amount rather than "₹0", since
+     every pre-0009 row carries 0 only because there was no field to fill in.
+   * `create_transaction` gains a sixth parameter, `p_amount`. The old
+     five-argument signature is **dropped** — leaving both would give PostgREST an
+     ambiguous overload. This makes the migration and the app build a matched
+     pair: apply this **before** shipping a build that sends `p_amount`, or every
+     save fails with "Could not find the function ... in the schema cache".
+   * `amount` is deliberately not added to any client grant. Like `invoice_no`, it
+     is writable only through the RPC, so the figure on an issued invoice cannot
+     be edited after the fact.
+   * `amount` does **not** move `parties.balance`, which remains a cylinder count.
+     Nothing tracks money outstanding.
+
+   No sign-out needed.
+
+10. `0010_receivables.sql` — **required.** The money-outstanding ledger: what each
+    party owes.
+
+    * Adds `parties.amount_due` (rupees owed) alongside `parties.balance`
+      (cylinders held). **Two balances, not interchangeable** — one is money, the
+      other is a count.
+    * Adds a `payments` table: money received, recorded against the party rather
+      than matched to an invoice. Readable by both roles, writable only through
+      the RPCs, and immutable — there is no UPDATE path.
+    * Adds `record_payment` and `delete_payment`. Deleting restores the amount to
+      `amount_due` in the same database transaction, which is why removal is an
+      RPC and not a DELETE grant.
+    * `create_transaction` now moves `amount_due` alongside `balance`. Its
+      **signature is unchanged**, so this migration does not have to ship in
+      lockstep with an app build — an older build keeps working and simply won't
+      show the due figure.
+    * Backfills `amount_due` from existing data. The same expression reconciles it
+      at any time:
+
+      ```sql
+      select p.id, p.name, p.amount_due,
+             coalesce((select sum(t.amount) from transactions t where t.party_id = p.id), 0)
+           - coalesce((select sum(pay.amount) from payments pay where pay.party_id = p.id), 0)
+             as recomputed
+      from parties p
+      where p.amount_due <> coalesce((select sum(t.amount) from transactions t where t.party_id = p.id), 0)
+                          - coalesce((select sum(pay.amount) from payments pay where pay.party_id = p.id), 0);
+      ```
+
+      Zero rows means the cache agrees with its sources.
+
+    A negative `amount_due` is not a bug: the party is in credit (an advance or an
+    overpayment). No sign-out needed.
+
 ## 3. Enable the Custom Access Token Hook
 
 Migration `0003` only creates the function — Supabase won't call it until you wire it up:

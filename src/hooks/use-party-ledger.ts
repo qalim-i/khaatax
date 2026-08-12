@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { startOfMonthIso } from '@/lib/date';
 import { logError, toUserMessage } from '@/lib/errors';
+import { summariseReceivables } from '@/lib/receivables';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
 
@@ -61,18 +62,23 @@ export function usePartyLedger() {
     return rows.filter((r) => r.party.name.toLowerCase().includes(q));
   }, [rows, query]);
 
-  const totals = useMemo(
-    () =>
-      rows.reduce(
-        (acc, r) => ({
-          filledSentMtd: acc.filledSentMtd + r.filledSentMtd,
-          emptyReceivedMtd: acc.emptyReceivedMtd + r.emptyReceivedMtd,
-          netBalance: acc.netBalance + r.party.balance,
-        }),
-        { filledSentMtd: 0, emptyReceivedMtd: 0, netBalance: 0 }
-      ),
-    [rows]
-  );
+  /*
+    Totals are over ALL rows, not the filtered view — they describe the book, and
+    a "total outstanding" that moved as you typed in the search box would be a
+    figure nobody could act on.
+  */
+  const totals = useMemo(() => {
+    const counts = rows.reduce(
+      (acc, r) => ({
+        filledSentMtd: acc.filledSentMtd + r.filledSentMtd,
+        emptyReceivedMtd: acc.emptyReceivedMtd + r.emptyReceivedMtd,
+        netBalance: acc.netBalance + r.party.balance,
+      }),
+      { filledSentMtd: 0, emptyReceivedMtd: 0, netBalance: 0 }
+    );
+
+    return { ...counts, ...summariseReceivables(rows.map((r) => r.party)) };
+  }, [rows]);
 
   return { rows: filteredRows, totals, loading, error, query, setQuery, refresh: load };
 }

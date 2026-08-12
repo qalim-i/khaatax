@@ -1,5 +1,14 @@
-import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { colors, spacing, typography } from '@/constants/design-tokens';
@@ -14,6 +23,7 @@ export function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   async function handleSignIn() {
     setError(null);
@@ -30,47 +40,75 @@ export function SignInScreen() {
     }
   }
 
+  const canSubmit = !!email && !!password && !loading;
+
+  /*
+    The form was a bare centred column, so the keyboard covered the password field
+    and the Sign In button with no way to reach them. Two things fix it together:
+
+    - `KeyboardAvoidingView` shrinks the available space when the keyboard opens.
+      Android needs an explicit behaviour too — it was `undefined` here, which is a
+      no-op, and the app runs edge-to-edge, so the window does not resize on its own.
+    - The `ScrollView` is what actually rescues the field: React Native scrolls a
+      focused input back into view inside one, and it leaves the form reachable on a
+      short screen even with no keyboard up. `flexGrow` keeps the column centred
+      while it still fits.
+  */
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.title}>KhaataX</Text>
-      <Text style={styles.subtitle}>Sign in with the account provided by your admin.</Text>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>KhaataX</Text>
+        <Text style={styles.subtitle}>Sign in with the account provided by your admin.</Text>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoComplete="email"
-          placeholder="you@company.com"
-          placeholderTextColor={colors.textSecondary}
-        />
-      </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+            placeholder="you@company.com"
+            placeholderTextColor={colors.textSecondary}
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+          />
+        </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="password"
-          placeholder="••••••••"
-          placeholderTextColor={colors.textSecondary}
-        />
-      </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            ref={passwordRef}
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoComplete="password"
+            placeholder="password"
+            placeholderTextColor={colors.textSecondary}
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              if (canSubmit) handleSignIn();
+            }}
+          />
+        </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {loading ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : (
-        <PrimaryButton label="Sign In" onPress={handleSignIn} disabled={!email || !password} />
-      )}
+        {loading ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <PrimaryButton label="Sign In" onPress={handleSignIn} disabled={!email || !password} />
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -79,14 +117,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
     gap: spacing.md,
   },
   title: {
     ...typography.h2,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.brand,
     textAlign: 'center',
   },
   subtitle: {

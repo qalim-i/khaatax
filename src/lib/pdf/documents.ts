@@ -14,15 +14,21 @@
  * definition of the layout — without the server. See SAD.md Section 7.
  *
  * Invoice vs Delivery Challan is a real distinction, not two names for one
- * document: the invoice is the billing record and carries the money columns and
- * `invoice_no`; the challan accompanies the goods and carries only quantities
- * and `dc_no`. The two numbers come from independent sequences, so a
- * transaction's INV and DC numbers do not match and must never be conflated
- * (TRD Section 4).
+ * document: the invoice is the billing record and carries the full money block
+ * and `invoice_no`; the challan accompanies the goods and carries `dc_no`. The
+ * two numbers come from independent sequences, so a transaction's INV and DC
+ * numbers do not match and must never be conflated (TRD Section 4).
+ *
+ * The challan used to carry no money at all, on the reasoning that a challan is
+ * not a bill. That was reversed by request: `transactions.amount` (migration
+ * 0009) is printed on BOTH documents, so the amount charged travels with the
+ * goods as well as with the bill. The challan still shows only that one figure —
+ * no deposit, no outstanding balance — and still says it is not a bill.
  */
 
 import { BUSINESS } from '@/constants/business';
-import { formatCurrency, formatDisplayDate } from '@/lib/format';
+import { formatCurrency, formatCurrencyExact, formatDisplayDate } from '@/lib/format';
+import { dueLabel, dueMagnitude, dueState } from '@/lib/receivables';
 import type { Party, Transaction } from '@/types/db';
 
 export type DocumentKind = 'invoice' | 'challan';
@@ -120,6 +126,19 @@ function partyBlock(party: Party): string {
     </div>`;
 }
 
+/**
+ * The charged figure, as it appears on a document.
+ *
+ * An em dash rather than "₹0" when nothing was recorded: every transaction
+ * written before migration 0009 carries 0 because there was no field to fill in,
+ * and printing "₹0" on those would assert a free delivery that nobody ever
+ * agreed to. A genuine zero charge reads the same way, which is the honest
+ * outcome — the document says nothing was billed either way.
+ */
+function amountText(tx: Transaction): string {
+  return tx.amount > 0 ? escapeHtml(formatCurrencyExact(tx.amount)) : '&mdash;';
+}
+
 function signatures(): string {
   return `
     <div class="signatures">
@@ -145,8 +164,15 @@ ${body}
 }
 
 /**
- * The billing document. Carries `invoice_no` and the party's running cylinder
- * balance, which is what the invoice is actually settling.
+ * The billing document. Carries `invoice_no`, the cylinders held (a count), and
+ * — since migration 0010 — the party's running money balance.
+ *
+ * The account total is CURRENT, not as-at the transaction date: it is read off
+ * `parties.amount_due` at print time, so reprinting an old invoice shows today's
+ * position, not the position the day it was issued. That is the same treatment
+ * the cylinder balance has always had, and the note under the table says so
+ * rather than letting the figure imply otherwise. Point-in-time statements would
+ * need the payment history replayed to a date, which is a different document.
  */
 export function buildInvoiceHtml(party: Party, tx: Transaction): string {
   const title = documentTitle('invoice', tx);
@@ -174,6 +200,7 @@ export function buildInvoiceHtml(party: Party, tx: Transaction): string {
           <th class="num">Filled Sent</th>
           <th class="num">Empty Received</th>
           <th class="num">Net</th>
+          <th class="num">Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -182,32 +209,45 @@ export function buildInvoiceHtml(party: Party, tx: Transaction): string {
           <td class="num">${tx.filled_sent}</td>
           <td class="num">${tx.empty_received}</td>
           <td class="num">${netMovement}</td>
+          <td class="num">${amountText(tx)}</td>
         </tr>
       </tbody>
     </table>
     <table class="totals">
       <tbody>
+        <tr class="emphasis">
+          <td class="label">Amount Charged</td>
+          <td class="value">${amountText(tx)}</td>
+        </tr>
         <tr>
           <td class="label">Security Deposit Held</td>
           <td class="value">${escapeHtml(formatCurrency(party.security_deposit))}</td>
         </tr>
-        <tr class="emphasis">
-          <td class="label">Cylinder Balance Outstanding</td>
+        <tr>
+          <td class="label">Cylinders Held (count)</td>
           <td class="value">${escapeHtml(String(party.balance))}</td>
+        </tr>
+        <tr class="emphasis">
+          <td class="label">${escapeHtml(dueLabel(party.amount_due))}${
+            dueState(party.amount_due) === 'credit' ? ' (advance held)' : ''
+          }</td>
+          <td class="value">${escapeHtml(formatCurrencyExact(dueMagnitude(party.amount_due)))}</td>
         </tr>
       </tbody>
     </table>
     <div class="note">
-      Cylinder balance is a count of cylinders held by the party, not a monetary amount.
+      &ldquo;Cylinders Held&rdquo; is a count of cylinders with the party, not a monetary amount.
       Security deposit is refundable on return of all cylinders in good condition.
+      The account total shown is the party&rsquo;s running balance as at printing, including this invoice.
     </div>
     ${signatures()}`
   );
 }
 
 /**
- * The goods-movement document. Deliberately carries no money — a challan travels
- * with the delivery and records quantities only.
+ * The goods-movement document: quantities, plus the amount charged so the figure
+ * travels with the delivery. It carries no other money — no deposit, no
+ * outstanding balance — and still refers billing to the invoice.
  */
 export function buildChallanHtml(party: Party, tx: Transaction): string {
   const title = documentTitle('challan', tx);
@@ -233,6 +273,7 @@ export function buildChallanHtml(party: Party, tx: Transaction): string {
           <th>Cylinder Type</th>
           <th class="num">Filled Sent</th>
           <th class="num">Empty Received</th>
+          <th class="num">Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -240,6 +281,15 @@ export function buildChallanHtml(party: Party, tx: Transaction): string {
           <td>${escapeHtml(tx.cylinder_type)}</td>
           <td class="num">${tx.filled_sent}</td>
           <td class="num">${tx.empty_received}</td>
+          <td class="num">${amountText(tx)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="totals">
+      <tbody>
+        <tr class="emphasis">
+          <td class="label">Amount Charged</td>
+          <td class="value">${amountText(tx)}</td>
         </tr>
       </tbody>
     </table>

@@ -4,6 +4,21 @@ export function formatCurrency(amount: number): string {
   return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 }
 
+/**
+ * Money on a document, always to the paisa: "₹1,250.50", "₹12,500.00".
+ *
+ * `formatCurrency` rounds to whole rupees, which is right for dashboards and
+ * summary tiles but wrong on an Invoice or Delivery Challan — a charge of
+ * ₹1,250.50 printed as "₹1,251" is a figure the party is being handed that does
+ * not match what was recorded.
+ */
+export function formatCurrencyExact(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 /** Compact form for chart axes, where full figures don't fit. */
 export function formatCurrencyCompact(amount: number): string {
   if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(1)}Cr`;

@@ -15,6 +15,7 @@ function party(overrides: Partial<Party> = {}): Party {
     contact: '98765 43210',
     security_deposit: 5000,
     balance: 12,
+    amount_due: 0,
     created_at: '2026-01-01T00:00:00Z',
     ...overrides,
   };
@@ -30,6 +31,7 @@ function transaction(overrides: Partial<Transaction> = {}): Transaction {
     cylinder_type: 'Oxygen 40L',
     filled_sent: 10,
     empty_received: 4,
+    amount: 12500,
     created_by: 'user-1',
     created_at: '2026-08-11T09:00:00Z',
     ...overrides,
@@ -129,14 +131,106 @@ describe('buildInvoiceHtml', () => {
   });
 });
 
+describe('amount charged', () => {
+  // The manually-entered figure from migration 0009. It is printed on BOTH
+  // documents by request, so it must survive on each of them independently.
+  it('prints on the invoice, in the line item and as the charged total', () => {
+    const html = buildInvoiceHtml(party(), transaction({ amount: 12500 }));
+
+    expect(html).toContain('<td class="num">₹12,500.00</td>');
+    expect(html).toContain('Amount Charged');
+    expect(html).toContain('<td class="value">₹12,500.00</td>');
+  });
+
+  it('prints on the challan too', () => {
+    const html = buildChallanHtml(party(), transaction({ amount: 12500 }));
+
+    expect(html).toContain('<td class="num">₹12,500.00</td>');
+    expect(html).toContain('Amount Charged');
+  });
+
+  it('shows an em dash rather than ₹0 when nothing was charged', () => {
+    // Every transaction predating 0009 carries 0 because there was no field to
+    // fill in. Printing "₹0" on those would assert a free delivery.
+    for (const html of [
+      buildInvoiceHtml(party(), transaction({ amount: 0 })),
+      buildChallanHtml(party(), transaction({ amount: 0 })),
+    ]) {
+      expect(html).toContain('&mdash;');
+      expect(html).not.toContain('₹0<');
+    }
+  });
+
+  it('prints paise rather than rounding them away', () => {
+    // A charge of ₹1,250.50 shown as "₹1,251" is a figure on paper the party is
+    // handed that does not match what was recorded — hence formatCurrencyExact
+    // on documents, not the whole-rupee formatCurrency the dashboards use.
+    const html = buildInvoiceHtml(party(), transaction({ amount: 1250.5 }));
+
+    expect(html).toContain('₹1,250.50');
+    expect(html).not.toContain('₹1,251<');
+  });
+});
+
+describe('account balance on the invoice', () => {
+  // migration 0010. The invoice is the billing document, so it carries the
+  // running money balance; the challan does not.
+  it('prints what the party owes, labelled', () => {
+    const html = buildInvoiceHtml(party({ amount_due: 47500 }), transaction());
+
+    expect(html).toContain('Owes');
+    expect(html).toContain('₹47,500.00');
+  });
+
+  it('prints a credit as a positive figure, never as a negative amount owed', () => {
+    // The failure this guards: "-₹2,500.00" under a heading that says the party
+    // owes it. An advance means the business owes THEM.
+    const html = buildInvoiceHtml(party({ amount_due: -2500 }), transaction());
+
+    expect(html).toContain('In credit');
+    expect(html).toContain('advance held');
+    expect(html).toContain('₹2,500.00');
+    expect(html).not.toContain('-₹2,500');
+    expect(html).not.toContain('₹-2,500');
+  });
+
+  it('says settled when the account is square', () => {
+    const html = buildInvoiceHtml(party({ amount_due: 0 }), transaction());
+
+    expect(html).toContain('Settled');
+    expect(html).toContain('₹0.00');
+  });
+
+  it('keeps the cylinder count out of the money block', () => {
+    // Two balances exist per party and they are not interchangeable: `balance`
+    // is a count of cylinders, `amount_due` is rupees. The count must never pick
+    // up a currency symbol.
+    const html = buildInvoiceHtml(party({ balance: 12, amount_due: 47500 }), transaction());
+
+    expect(html).toContain('Cylinders Held (count)');
+    expect(html).toContain('<td class="value">12</td>');
+  });
+});
+
 describe('buildChallanHtml', () => {
-  it('carries quantities but no money — a challan is not a bill', () => {
-    const html = buildChallanHtml(party({ security_deposit: 5000 }), transaction());
+  it('carries the charged amount but no other money — a challan is not a statement', () => {
+    // The challan gained `amount` in 0009. It still carries no deposit and no
+    // outstanding balance: those belong to the billing record, not to the paper
+    // that travels with the goods.
+    const html = buildChallanHtml(
+      party({ security_deposit: 5000, amount_due: 47500 }),
+      transaction()
+    );
 
     expect(html).toContain('Oxygen 40L');
     expect(html).toContain('<td class="num">10</td>');
-    expect(html).not.toContain('₹');
     expect(html).not.toContain('Security Deposit');
+    expect(html).not.toContain('₹5,000');
+    expect(html).not.toContain('Cylinders Held');
+    // The running account balance is the invoice's job. A challan travels with
+    // the goods and is often handed to a driver.
+    expect(html).not.toContain('₹47,500.00');
+    expect(html).not.toContain('Owes');
   });
 });
 

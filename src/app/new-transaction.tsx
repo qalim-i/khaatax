@@ -9,6 +9,8 @@ import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useCreateTransaction } from '@/hooks/use-create-transaction';
 import { notify } from '@/lib/dialog';
+import { formatCurrencyExact } from '@/lib/format';
+import { parseAmount } from '@/lib/money';
 import { parseQuantity } from '@/lib/quantity';
 import { useParties } from '@/hooks/use-parties';
 import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
@@ -34,6 +36,7 @@ export default function NewTransactionScreen() {
   const [cylinderType, setCylinderType] = useState('');
   const [filledSent, setFilledSent] = useState('0');
   const [emptyReceived, setEmptyReceived] = useState('0');
+  const [amount, setAmount] = useState('');
 
   const filledQty = parseQuantity(filledSent);
   const emptyQty = parseQuantity(emptyReceived);
@@ -46,13 +49,22 @@ export default function NewTransactionScreen() {
       ? 'A transaction has to move at least one cylinder.'
       : null;
 
+  const amountValue = parseAmount(amount);
+  const amountError =
+    amountValue === null ? 'Amount must be rupees, zero or more (up to two decimals).' : null;
+
   const canSubmit =
-    !!partyId && cylinderType.trim().length > 0 && movesAtLeastOne && !submitting;
+    !!partyId &&
+    cylinderType.trim().length > 0 &&
+    movesAtLeastOne &&
+    amountValue !== null &&
+    !submitting;
 
   async function handleSubmit() {
     // Re-checked rather than trusted from `canSubmit`: the button is only one way
     // in, and the values are read again here.
     if (!partyId || filledQty === null || emptyQty === null || filledQty + emptyQty === 0) return;
+    if (amountValue === null) return;
 
     const { transaction, error: failure } = await submit({
       party_id: partyId,
@@ -60,9 +72,13 @@ export default function NewTransactionScreen() {
       cylinder_type: cylinderType.trim(),
       filled_sent: filledQty,
       empty_received: emptyQty,
+      amount: amountValue,
     });
     if (transaction) {
-      notify('Transaction Recorded', `Invoice #${transaction.invoice_no} · DC #${transaction.dc_no}`);
+      notify(
+        'Transaction Recorded',
+        `Invoice #${transaction.invoice_no} · DC #${transaction.dc_no} · ${formatCurrencyExact(transaction.amount)}`
+      );
       router.back();
     } else {
       notify('Failed to save transaction', failure ?? 'The transaction could not be saved.');
@@ -160,6 +176,35 @@ export default function NewTransactionScreen() {
             <ErrorBanner message={quantityError} />
           </View>
 
+          {/*
+            Billing sits apart from Cylinder Details on purpose: the quantities
+            move stock and the party's cylinder balance, this figure moves
+            neither. It is recorded and printed on the Invoice and DC, nothing
+            more — there is no money-outstanding ledger behind it.
+          */}
+          <View style={styles.cylinderSection}>
+            <Text style={styles.sectionLabel}>Billing</Text>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Amount Charged (₹)</Text>
+              <TextInput
+                style={styles.numberInput}
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+              <Text style={styles.fieldHint}>
+                {amountValue !== null && amountValue > 0
+                  ? `${formatCurrencyExact(amountValue)} will be printed on the Invoice and DC.`
+                  : 'Leave blank or zero if nothing is being charged.'}
+              </Text>
+            </View>
+
+            <ErrorBanner message={amountError} />
+          </View>
+
           <View style={styles.actions}>
             <Pressable style={styles.cancelButton} onPress={() => router.back()}>
               <Text style={styles.cancelLabel}>Cancel</Text>
@@ -237,6 +282,11 @@ const styles = StyleSheet.create({
   label: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  fieldHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   dateControl: {
     height: 40,

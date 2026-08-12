@@ -16,7 +16,16 @@ export interface Party {
   name: string;
   contact: string | null;
   security_deposit: number;
+  /** Cylinders held by the party. A COUNT, not money. */
   balance: number;
+  /**
+   * Rupees the party owes: charges less payments (migration 0010).
+   *
+   * Negative means the party is in credit — an advance or an overpayment, both
+   * ordinary here. Not interchangeable with `balance`; never render one where
+   * the other belongs.
+   */
+  amount_due: number;
   created_at: string;
 }
 
@@ -37,8 +46,46 @@ export interface Transaction {
   cylinder_type: string;
   filled_sent: number;
   empty_received: number;
+  /**
+   * Rupees charged to the party for this transaction, entered by hand on New
+   * Transaction and printed on both documents.
+   *
+   * Recorded, not accounted: this does NOT feed `parties.balance`, which is a
+   * cylinder count. Rows written before migration 0009 carry 0.
+   */
+  amount: number;
   created_by: string;
   created_at: string;
+}
+
+export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'cheque' | 'other';
+
+/**
+ * Money received from a party (migration 0010). Recorded against the party, not
+ * matched to an invoice — KhaataX is a running account, not an AR system.
+ *
+ * Immutable: there is no update path. A wrong entry is removed via
+ * `delete_payment`, which puts the money back on `parties.amount_due`, and
+ * re-recorded.
+ */
+export interface Payment {
+  id: string;
+  party_id: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  note: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+// Input for the record_payment RPC. `created_by` is stamped by the server.
+export interface RecordPaymentInput {
+  party_id: string;
+  date: string;
+  amount: number;
+  method: PaymentMethod;
+  note: string | null;
 }
 
 export interface Stock {
@@ -88,6 +135,7 @@ export interface CreateTransactionInput {
   cylinder_type: string;
   filled_sent: number;
   empty_received: number;
+  amount: number;
 }
 
 export interface CreateTransactionResult {

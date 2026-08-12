@@ -11,6 +11,7 @@ import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useCreateParty } from '@/hooks/use-create-party';
 import { usePartyLedger } from '@/hooks/use-party-ledger';
 import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
+import { formatCurrencyExact } from '@/lib/format';
 import type { PartyInput } from '@/types/db';
 
 export default function PartyLedgerScreen() {
@@ -74,11 +75,32 @@ export default function PartyLedgerScreen() {
                 </View>
               </View>
               <View style={styles.summaryCard}>
-                <Text style={styles.summaryLabel}>NET BALANCE (OUTSTANDING)</Text>
+                <Text style={styles.summaryLabel}>CYLINDERS OUT (NET)</Text>
                 <View style={styles.summaryValueRow}>
                   <Icon name="warning-triangle" width={18} height={16} color={colors.danger} />
                   <Text style={styles.summaryValue}>{totals.netBalance.toLocaleString()}</Text>
                 </View>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>
+                  TOTAL OUTSTANDING · {totals.partiesDue}{' '}
+                  {totals.partiesDue === 1 ? 'PARTY' : 'PARTIES'}
+                </Text>
+                <View style={styles.summaryValueRow}>
+                  <Icon name="wallet" width={18} height={16} color={colors.danger} />
+                  <Text style={styles.summaryValue}>{formatCurrencyExact(totals.totalDue)}</Text>
+                </View>
+                {/*
+                  Credit is shown as its own line rather than netted off the total
+                  above. Netting hides the thing that matters: ₹50,000 owed across
+                  six parties and ₹50,000 sitting as one advance cancel to zero,
+                  which reads as "nothing to collect".
+                */}
+                {totals.totalCredit > 0 ? (
+                  <Text style={styles.summaryFootnote}>
+                    {formatCurrencyExact(totals.totalCredit)} held as advances, not deducted above
+                  </Text>
+                ) : null}
               </View>
             </View>
 
@@ -192,6 +214,10 @@ const styles = StyleSheet.create({
     ...typography.statValue,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  summaryFootnote: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   loading: {
     marginTop: spacing.sm,

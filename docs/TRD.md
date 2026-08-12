@@ -53,8 +53,23 @@ parties (
   name               text not null,
   contact            text,
   security_deposit   numeric default 0,
-  balance            numeric default 0,      -- derived/cached
+  balance            numeric default 0,             -- derived/cached: CYLINDERS held (a count)
+  amount_due         numeric(12,2) not null default 0, -- derived/cached: RUPEES owed (0010)
   created_at         timestamptz default now()
+)
+
+-- Payments received from a party (migration 0010). Recorded against the party,
+-- not matched to an invoice. Immutable: no UPDATE path.
+payments (
+  id           uuid primary key default gen_random_uuid(),
+  party_id     uuid not null references parties(id),
+  date         date not null default current_date,
+  amount       numeric(12,2) not null check (amount > 0),
+  method       text not null default 'cash'
+               check (method in ('cash','upi','bank','cheque','other')),
+  note         text,
+  created_by   uuid not null references users(id) default auth.uid(),
+  created_at   timestamptz default now()
 )
 
 -- Transactions (cylinder movement)
@@ -67,6 +82,7 @@ transactions (
   cylinder_type    text not null,
   filled_sent      integer not null default 0,
   empty_received   integer not null default 0,
+  amount           numeric(12,2) not null default 0,  -- charged; recorded, not accounted
   created_by       uuid not null references users(id),
   created_at       timestamptz default now()
 )
@@ -195,6 +211,32 @@ The app uses Supabase's auto-generated REST/Realtime API via the `supabase-js` c
 ```
 
 This must run as a single atomic operation (database transaction) so a failure partway through cannot leave stock, party balance, and transaction records inconsistent.
+
+`transactions.amount` (migration `0009`) rides along in step 4: it is validated (non-null, non-negative, rounded to two places) before step 2, then stored and printed on both the Invoice and the Delivery Challan.
+
+Since migration `0010` it also feeds step 5, which now moves **two** columns in one statement: `parties.balance` (cylinders held, a count) and `parties.amount_due` (rupees owed). They are separate quantities and must never be rendered in place of each other.
+
+### 6.2 Required Server-Side Function: Record Payment
+
+```
+1. Authorise (owner or manager)
+2. Validate: amount present, > 0 after rounding to 2 places; date present;
+   method in (cash, upi, bank, cheque, other)
+3. Lock the party row (FOR UPDATE) — concurrent payments against one party
+   would otherwise lose an update on money
+4. Insert into payments (...)
+5. parties.amount_due -= amount
+```
+
+Atomic, for the same reason as 6.1: a payment row without the balance move, or the reverse, leaves the cached column disagreeing with its own source data and nothing detects it. `delete_payment` is the mirror image (delete the row, add the amount back) and exists because payments have no UPDATE path — a wrong entry is removed and re-recorded rather than silently edited.
+
+The invariant, and the query to reconcile with:
+
+```sql
+amount_due = coalesce(sum(transactions.amount), 0) - coalesce(sum(payments.amount), 0)
+```
+
+`amount_due` is deliberately unconstrained in sign: negative means the party is in credit (an advance or an overpayment), which is an ordinary state, not a data error.
 
 ## 7. Non-Functional Requirements
 

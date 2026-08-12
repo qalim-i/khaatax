@@ -57,6 +57,20 @@ If a task seems to require any of the above, stop and ask rather than implementi
   - `expenses` are editable/deletable only by whoever logged them (the owner keeps full
     access). Attribution is unenforceable otherwise. **This narrows the original
     "full read/write" rule** and is deliberate; see `0007` for the reasoning.
+- `transactions.amount` (migration `0009`) is the rupee figure charged for a
+  transaction, typed by hand on New Transaction.
+- **There are two balances per party and they are not interchangeable.**
+  `parties.balance` is a COUNT of cylinders held; `parties.amount_due` (migration `0010`) is
+  RUPEES owed. Never render one where the other belongs. Both are derived columns moved only
+  by `security definer` RPCs, and neither is in any client grant.
+- `payments` (migration `0010`) records money received, against the **party**, not against an
+  invoice. `amount_due = sum(transactions.amount) - sum(payments.amount)`. There is no
+  allocation to specific invoices, no partial-invoice settlement, and no aging of money —
+  the aging report stays about cylinders (PRD INV-4). Ask before adding any of those.
+- A negative `amount_due` is valid and means the party is in credit (an advance or an
+  overpayment). Read it through `src/lib/receivables.ts`, never raw — that module exists
+  because rendering `-2500` under a heading that says "owes" tells the user to collect money
+  from someone the business actually owes.
 - `transactions.invoice_no` and `transactions.dc_no` come from two **independent** Postgres sequences (`invoice_no_seq`, `dc_no_seq`), generated server-side — never client-side, to avoid collisions from concurrent writes.
 
 ## Non-Negotiable Rules
@@ -117,6 +131,40 @@ review found in `0007`:
 
 `toUserMessage` also takes `unknown` rather than `Error` — a thrown primitive used to
 crash the handler that was supposed to contain it.
+
+**Amount charged (post-Phase 4):** migration `0009_transaction_amount.sql` adds
+`transactions.amount` — a manually-entered rupee figure per transaction, printed on both
+the Invoice and the Delivery Challan. No PRD story called for it; it was requested directly.
+
+- `create_transaction` gains a sixth parameter, `p_amount`, and the five-argument signature is
+  **dropped**. Migration and app build are therefore a matched pair — **apply `0009` before
+  shipping a build with it**, or every save fails with "function not found in the schema cache".
+- `amount` gets no client grant, so an issued invoice's figure is not editable after the fact.
+- **This reverses a Phase 4 decision**: the Delivery Challan used to carry no money at all
+  ("a challan is not a bill"). It now prints the charged amount — and only that; no deposit,
+  no outstanding balance. `documents.test.ts` pins both halves.
+- Documents format money with `formatCurrencyExact` (always two decimals), not the whole-rupee
+  `formatCurrency` the dashboards use — ₹1,250.50 printed as "₹1,251" is a wrong figure on paper.
+
+**Receivables ledger (post-Phase 4):** migration `0010_receivables.sql` adds
+`parties.amount_due` and the `payments` table. Requested directly; no PRD story covers it.
+
+- **This reverses `0009`'s explicit "not a receivables ledger" decision.** `0009`'s header
+  says the amount is recorded and never summed; `0010` sums it and is the later word. Both
+  headers are left intact so the sequence is legible.
+- What makes it a ledger rather than a running total is **payments**: charges alone only ever
+  grow. `record_payment` and `delete_payment` are the write path; `payments` has no client
+  INSERT/UPDATE/DELETE grant.
+- Payments are **immutable** — there is no edit path. A mis-keyed figure is removed (which
+  returns the money to `amount_due` in the same database transaction) and re-recorded.
+  `delete_payment` is scoped to whoever recorded it, plus the owner — the same rule `0007`
+  applied to expenses.
+- `record_payment` takes `FOR UPDATE` on the party row. Two managers recording payments
+  against one party without it is a lost update on money.
+- The signature of `create_transaction` is unchanged by `0010`, so unlike `0009` it does not
+  have to ship in lockstep with an app build.
+- Ledger totals report money owed and money held as credit as **two separate figures**; they
+  are never netted. See the comment in `src/lib/receivables.ts` for why.
 
 **Still outstanding:**
 - The owner web view (PRD GEN-3) was deliberately deferred — not built. This is the last unbuilt "Should" in the PRD.

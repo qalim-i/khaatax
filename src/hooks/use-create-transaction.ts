@@ -29,6 +29,7 @@ export function useCreateTransaction() {
       p_cylinder_type: input.cylinder_type,
       p_filled_sent: input.filled_sent,
       p_empty_received: input.empty_received,
+      p_amount: input.amount,
     });
     setSubmitting(false);
     if (rpcError) {

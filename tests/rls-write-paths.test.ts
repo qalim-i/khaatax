@@ -160,6 +160,7 @@ describe('write-path RLS (migration 0007)', () => {
       p_cylinder_type: 'probe',
       p_filled_sent: -100,
       p_empty_received: 0,
+      p_amount: 100,
     });
 
     // Negative quantities used to run the function backwards: stock went UP and
@@ -175,6 +176,7 @@ describe('write-path RLS (migration 0007)', () => {
       p_cylinder_type: 'probe',
       p_filled_sent: 0,
       p_empty_received: 0,
+      p_amount: 100,
     });
 
     expect(error).not.toBeNull();
@@ -188,10 +190,43 @@ describe('write-path RLS (migration 0007)', () => {
       p_cylinder_type: '   ',
       p_filled_sent: 1,
       p_empty_received: 0,
+      p_amount: 100,
     });
 
     expect(error).not.toBeNull();
     expect(error!.message).toMatch(/cylinder type is required/i);
+  });
+
+  it('create_transaction rejects a negative amount', async () => {
+    // migration 0009. The figure is printed on a document handed to the party,
+    // so a negative charge is not a correction — it is a nonsense bill.
+    const { error } = await manager.rpc('create_transaction', {
+      p_party_id: MISSING_PARTY,
+      p_date: '2026-01-01',
+      p_cylinder_type: 'probe',
+      p_filled_sent: 1,
+      p_empty_received: 0,
+      p_amount: -100,
+    });
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/amount charged cannot be negative/i);
+  });
+
+  it('create_transaction rejects a missing amount rather than defaulting it to zero', async () => {
+    // A client that forgot the field would otherwise silently record a free
+    // delivery — which is why p_amount has no DEFAULT and NULL is an error.
+    const { error } = await manager.rpc('create_transaction', {
+      p_party_id: MISSING_PARTY,
+      p_date: '2026-01-01',
+      p_cylinder_type: 'probe',
+      p_filled_sent: 1,
+      p_empty_received: 0,
+      p_amount: null,
+    });
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/amount charged is required/i);
   });
 
   it('create_transaction validates before it reaches the party check', async () => {
@@ -205,6 +240,7 @@ describe('write-path RLS (migration 0007)', () => {
       p_cylinder_type: 'probe',
       p_filled_sent: 1,
       p_empty_received: 0,
+      p_amount: 100,
     });
 
     expect(error).not.toBeNull();
@@ -212,6 +248,185 @@ describe('write-path RLS (migration 0007)', () => {
     // 0008 stopped interpolating the id into this message: it reaches the screen
     // verbatim (errors.ts passes KX001 through), and an internal uuid is neither
     // actionable nor ours to disclose.
+    expect(error!.message).not.toContain(MISSING_PARTY);
+  });
+
+  // ---------------------------------------------------------------------------
+  // payments and the receivables ledger — migration 0010.
+  //
+  // `parties.amount_due` is cached money. If a client can write either the
+  // payments table or the column directly, the two can disagree and nothing in
+  // the system would notice — so both are closed and record_payment is the only
+  // way in, exactly as create_transaction is for transactions.
+  // ---------------------------------------------------------------------------
+
+  it('manager cannot insert a payment directly', async () => {
+    const { error } = await manager.from('payments').insert({
+      party_id: MISSING_PARTY,
+      date: '2026-01-01',
+      amount: 500,
+      method: 'cash',
+    });
+
+    // A permission failure, not a foreign-key complaint: an FK error would mean
+    // the write was authorised and merely pointed at a missing party.
+    expect(error).not.toBeNull();
+    expect(isPermissionDenied(error)).toBe(true);
+  });
+
+  it('manager cannot delete a payment directly', async () => {
+    // Deleting the row without the RPC would leave amount_due overstating what
+    // was received, with nothing to reconcile it.
+    const { error } = await manager
+      .from('payments')
+      .delete()
+      .eq('id', '00000000-0000-0000-0000-000000000000');
+
+    expect(error).not.toBeNull();
+    expect(isPermissionDenied(error)).toBe(true);
+  });
+
+  it('manager cannot set a party amount_due, at creation or afterwards', async () => {
+    const name = `__rls_probe_due_${Date.now()}`;
+    let partyId: string | undefined;
+
+    try {
+      // 0008 scoped the INSERT grant to (name, contact, security_deposit), so
+      // amount_due — added later — is excluded by construction. This proves it.
+      const seeded = await manager
+        .from('parties')
+        .insert({ name, contact: null, security_deposit: 0, amount_due: 9_999 })
+        .select()
+        .single();
+
+      expect(seeded.error).not.toBeNull();
+      expect(isPermissionDenied(seeded.error)).toBe(true);
+
+      const { data, error: insertError } = await manager
+        .from('parties')
+        .insert({ name, contact: null, security_deposit: 0 })
+        .select()
+        .single();
+
+      expect(insertError).toBeNull();
+      partyId = (data as { id: string }).id;
+      expect((data as { amount_due: number }).amount_due).toBe(0);
+
+      const tamper = await manager
+        .from('parties')
+        .update({ amount_due: 9_999 })
+        .eq('id', partyId!);
+
+      expect(tamper.error).not.toBeNull();
+      expect(isPermissionDenied(tamper.error)).toBe(true);
+    } finally {
+      if (partyId) await manager.from('parties').delete().eq('id', partyId);
+    }
+  });
+
+  it('record_payment moves the money and delete_payment puts it back', async () => {
+    // The positive control for the whole ledger: it proves the assertions above
+    // fail on the PATH rather than on the role, and that the cached column and
+    // the payment row stay in step in both directions.
+    const name = `__rls_probe_payment_${Date.now()}`;
+    let partyId: string | undefined;
+    let paymentId: string | undefined;
+
+    try {
+      const { data: created, error: createError } = await manager
+        .from('parties')
+        .insert({ name, contact: null, security_deposit: 0 })
+        .select()
+        .single();
+
+      expect(createError).toBeNull();
+      partyId = (created as { id: string }).id;
+
+      const paid = await manager.rpc('record_payment', {
+        p_party_id: partyId,
+        p_date: '2026-01-01',
+        p_amount: 1500.5,
+        p_method: 'upi',
+        p_note: '__rls_probe',
+      });
+
+      expect(paid.error).toBeNull();
+      const payment = paid.data as { id: string; amount: number; created_by: string };
+      paymentId = payment.id;
+      expect(Number(payment.amount)).toBe(1500.5);
+      // Attribution is stamped by the server, not sent by the client.
+      expect(payment.created_by).toBe(managerId);
+
+      const afterPayment = await manager
+        .from('parties')
+        .select('amount_due')
+        .eq('id', partyId!)
+        .single();
+
+      // No charges on this party, so paying leaves it in credit — a negative
+      // amount_due is a real state, not an error.
+      expect(Number((afterPayment.data as { amount_due: number }).amount_due)).toBe(-1500.5);
+
+      const removed = await manager.rpc('delete_payment', { p_payment_id: paymentId });
+      expect(removed.error).toBeNull();
+      paymentId = undefined;
+
+      const afterDelete = await manager
+        .from('parties')
+        .select('amount_due')
+        .eq('id', partyId!)
+        .single();
+
+      expect(Number((afterDelete.data as { amount_due: number }).amount_due)).toBe(0);
+    } finally {
+      if (paymentId) await manager.rpc('delete_payment', { p_payment_id: paymentId });
+      if (partyId) await manager.from('parties').delete().eq('id', partyId);
+    }
+  });
+
+  it('record_payment rejects a zero or negative payment', async () => {
+    for (const amount of [0, -500]) {
+      const { error } = await manager.rpc('record_payment', {
+        p_party_id: MISSING_PARTY,
+        p_date: '2026-01-01',
+        p_amount: amount,
+        p_method: 'cash',
+        p_note: null,
+      });
+
+      // A negative "payment" is a charge, and charges belong on a transaction
+      // where they get an invoice number.
+      expect(error).not.toBeNull();
+      expect(error!.message).toMatch(/more than zero/i);
+    }
+  });
+
+  it('record_payment rejects an unknown method', async () => {
+    const { error } = await manager.rpc('record_payment', {
+      p_party_id: MISSING_PARTY,
+      p_date: '2026-01-01',
+      p_amount: 100,
+      p_method: 'crypto',
+      p_note: null,
+    });
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/unknown payment method/i);
+  });
+
+  it('record_payment validates before it reaches the party check', async () => {
+    // Same ordering rule as create_transaction: nothing is written, and no row
+    // is created, for a request that was never going to succeed.
+    const { error } = await manager.rpc('record_payment', {
+      p_party_id: MISSING_PARTY,
+      p_date: '2026-01-01',
+      p_amount: 100,
+      p_method: 'cash',
+      p_note: null,
+    });
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/party no longer exists/i);
     expect(error!.message).not.toContain(MISSING_PARTY);
   });
 
