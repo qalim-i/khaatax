@@ -1,15 +1,30 @@
 import { router } from 'expo-router';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { PartyFormModal } from '@/components/party/party-form-modal';
 import { PartyRow } from '@/components/party/party-row';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Icon } from '@/components/ui/icon';
-import { StatTile } from '@/components/ui/stat-tile';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
+import { useCreateParty } from '@/hooks/use-create-party';
 import { usePartyLedger } from '@/hooks/use-party-ledger';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
+import type { PartyInput } from '@/types/db';
 
 export default function PartyLedgerScreen() {
-  const { rows, totals, loading, query, setQuery } = usePartyLedger();
+  const { rows, totals, loading, error, query, setQuery, refresh } = usePartyLedger();
+  const { create } = useCreateParty();
+  const [formVisible, setFormVisible] = useState(false);
+
+  useRefreshOnFocus(refresh);
+
+  async function handleCreate(input: PartyInput) {
+    const failure = await create(input);
+    if (!failure) await refresh();
+    return failure;
+  }
 
   return (
     <View style={styles.container}>
@@ -35,6 +50,13 @@ export default function PartyLedgerScreen() {
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
+
+            <Pressable style={styles.addButton} onPress={() => setFormVisible(true)}>
+              <Icon name="plus" width={14} height={14} color={colors.white} />
+              <Text style={styles.addLabel}>Add Party</Text>
+            </Pressable>
+
+            <ErrorBanner message={error} />
 
             <View style={styles.summaryCards}>
               <View style={styles.summaryCard}>
@@ -68,8 +90,19 @@ export default function PartyLedgerScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
-          !loading ? <Text style={styles.emptyState}>No parties found.</Text> : null
+          !loading ? (
+            <Text style={styles.emptyState}>
+              {query.trim()
+                ? 'No parties match that search.'
+                : 'No parties yet. Tap "Add Party" to create your first customer.'}
+            </Text>
+          ) : null
         }
+      />
+      <PartyFormModal
+        visible={formVisible}
+        onClose={() => setFormVisible(false)}
+        onSubmit={handleCreate}
       />
     </View>
   );
@@ -118,6 +151,21 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
     fontSize: 14,
     color: colors.textPrimary,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    height: 44,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary,
+  },
+  addLabel: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.white,
   },
   summaryCards: {
     gap: spacing.sm,

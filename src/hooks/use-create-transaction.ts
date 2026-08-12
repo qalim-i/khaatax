@@ -3,11 +3,23 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { CreateTransactionInput, Transaction } from '@/types/db';
 
+export interface CreateTransactionOutcome {
+  transaction: Transaction | null;
+  error: string | null;
+}
+
 export function useCreateTransaction() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(input: CreateTransactionInput): Promise<Transaction | null> {
+  /**
+   * Returns the failure message alongside the row rather than leaving the caller
+   * to read `error` off this hook. A caller that reads hook state inside the same
+   * callback that triggered the save sees the *previous* render's value — which
+   * is null on the first attempt, so the first failure produced no message at
+   * all. Returning it removes that trap.
+   */
+  async function submit(input: CreateTransactionInput): Promise<CreateTransactionOutcome> {
     setSubmitting(true);
     setError(null);
     const { data, error: rpcError } = await supabase.rpc('create_transaction', {
@@ -20,9 +32,9 @@ export function useCreateTransaction() {
     setSubmitting(false);
     if (rpcError) {
       setError(rpcError.message);
-      return null;
+      return { transaction: null, error: rpcError.message };
     }
-    return data as Transaction;
+    return { transaction: data as Transaction, error: null };
   }
 
   return { submit, submitting, error };

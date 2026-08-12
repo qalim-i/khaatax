@@ -197,9 +197,26 @@ A single PostgreSQL schema (managed by Supabase) holds all entities. There is no
 | Auth | Supabase Auth | Fixed owner/manager accounts, role claim used by RLS policies |
 | Database | PostgreSQL | Relational integrity for balances, payroll totals, sequential numbering |
 | Charts | Recharts (web), Victory Native (mobile) | Dashboard visualizations per platform |
-| PDF Generation | Server-side (Supabase Edge Function + PDF library) | Consistent invoice/DC/report formatting regardless of client |
+| PDF Generation | Client-side (`expo-print`, HTML template in `src/lib/pdf/`) | Superseded the original server-side plan in Phase 4 — see note below |
 
 > This stack intentionally omits several v1 components — no SQLite offline store, no barcode scanning library, no push-notification-driven approval flow, and no receipt image storage pipeline.
+
+> **PDF generation — decision revised in Phase 4.** This row originally read
+> "Server-side (Supabase Edge Function + PDF library)", justified as "consistent
+> formatting regardless of client". That rationale assumed two clients. The owner
+> web view (PRD GEN-3) was deferred and never built, leaving the Expo app as the
+> only consumer, and an Edge Function would have added a deploy pipeline plus a
+> server-side data path next to the payroll RLS boundary for no formatting gain.
+>
+> Invoice and Delivery Challan PDFs are therefore rendered on-device by
+> `expo-print` from an HTML template, and handed to the OS share sheet by
+> `expo-sharing`. The template lives in `src/lib/pdf/documents.ts` as pure,
+> unit-tested string builders with no Expo or React dependency — so if GEN-3 is
+> ever built, the web client reuses the same definition and the original goal of
+> one layout is preserved without a server.
+>
+> Revisit this if a second client ships or if documents ever need to be generated
+> without a signed-in device present (e.g. a scheduled email of statements).
 
 ---
 

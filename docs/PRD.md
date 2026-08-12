@@ -131,6 +131,6 @@ The business currently tracks party-wise cylinder deliveries/returns, stock leve
 
 ## 11. Open Questions
 
-- Should WhatsApp/SMS sharing of invoices/DC be included in the initial release or deferred to a later phase?
+- ~~Should WhatsApp/SMS sharing of invoices/DC be included in the initial release or deferred to a later phase?~~ **Resolved (Phase 4): included, via the OS share sheet.** Generating an Invoice or DC hands the PDF to the native share sheet (`expo-sharing`), which already lists WhatsApp, SMS, email, and cloud storage. No WhatsApp Business API, no phone-number handling, and no separate integration to maintain. A direct WhatsApp deep link was considered and rejected — it cannot reliably attach a local file, so it would fall back to the share sheet anyway.
 - Does the owner want the ability to edit/void a transaction after creation, and if so, how should that affect invoice/DC numbering?
-- Should employees in the Payroll list be soft-deleted (kept for history) or hard-deleted when they leave?
+- ~~Should employees in the Payroll list be soft-deleted (kept for history) or hard-deleted when they leave?~~ **Resolved (Phase 3): soft delete.** "Remove" sets `employees.active = false`; the record is kept and can be restored, and only active employees count toward payroll cost (PAY-2). The `active` column already existed in the TRD schema for this purpose. Nothing in the app hard-deletes an employee.

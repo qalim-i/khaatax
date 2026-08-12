@@ -20,6 +20,14 @@ export interface Party {
   created_at: string;
 }
 
+// Input for creating a party. `balance` is deliberately absent — it is a derived
+// value moved only by the create_transaction RPC, never set from the client.
+export interface PartyInput {
+  name: string;
+  contact: string | null;
+  security_deposit: number;
+}
+
 export interface Transaction {
   id: string;
   party_id: string;
@@ -94,4 +102,12 @@ export interface CreateExpenseInput {
   amount: number;
   category: ExpenseCategory;
   note: string | null;
+}
+
+// Payroll entry input. `active` is not settable here — an employee starts active
+// and is retired via the soft-delete path, never created inactive.
+export interface EmployeeInput {
+  name: string;
+  role: string | null;
+  monthly_pay: number;
 }

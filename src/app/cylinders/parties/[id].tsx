@@ -1,16 +1,46 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ExportDocumentSheet } from '@/components/party/export-document-sheet';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { TransactionRow } from '@/components/party/transaction-row';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
+import { useExportPdf } from '@/hooks/use-export-pdf';
 import { usePartyDetail } from '@/hooks/use-party-detail';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
+import { formatCurrency } from '@/lib/format';
+import type { DocumentKind } from '@/lib/pdf/documents';
+import type { Transaction } from '@/types/db';
 
 export default function PartyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { party, transactions, loading } = usePartyDetail(id);
+  const { party, transactions, loading, error, refresh } = usePartyDetail(id);
+  const { exportDocument, exporting } = useExportPdf();
+
+  const [exportTarget, setExportTarget] = useState<Transaction | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  useRefreshOnFocus(refresh);
 
   const isSettled = (party?.balance ?? 0) === 0;
+  // Transactions arrive newest-first, so the header button acts on the delivery
+  // just recorded — the common case. Older ones are reachable by tapping a row.
+  const latestTransaction = transactions[0] ?? null;
+
+  function openExport(tx: Transaction) {
+    setExportError(null);
+    setExportTarget(tx);
+  }
+
+  async function handleExport(kind: DocumentKind) {
+    if (!party || !exportTarget) return;
+    const failure = await exportDocument(kind, party, exportTarget);
+    // Keep the sheet open on failure — the message belongs where the user is.
+    if (failure) setExportError(failure);
+    else setExportTarget(null);
+  }
 
   return (
     <View style={styles.container}>
@@ -45,7 +75,7 @@ export default function PartyDetailScreen() {
                   <Text style={styles.depositLabel}>Security Deposit</Text>
                   <Text style={styles.depositValue}>
                     {party && party.security_deposit > 0
-                      ? `$${party.security_deposit.toLocaleString()} held`
+                      ? `${formatCurrency(party.security_deposit)} held`
                       : 'None on file'}
                   </Text>
                 </View>
@@ -57,20 +87,39 @@ export default function PartyDetailScreen() {
                 ) : null}
               </View>
 
+              <ErrorBanner message={error} />
+
               <Pressable
-                style={styles.generateButton}
-                onPress={() => Alert.alert('Generate Invoice & DC', 'PDF export lands in Phase 4.')}>
-                <Text style={styles.generateLabel}>Generate Invoice & DC</Text>
+                style={[styles.generateButton, !latestTransaction && styles.generateDisabled]}
+                onPress={() => latestTransaction && openExport(latestTransaction)}
+                disabled={!latestTransaction}>
+                <Text style={styles.generateLabel}>
+                  {latestTransaction
+                    ? `Generate Invoice & DC · INV-${latestTransaction.invoice_no}`
+                    : 'Generate Invoice & DC'}
+                </Text>
               </Pressable>
+              {!latestTransaction ? (
+                <Text style={styles.generateHint}>
+                  Record a transaction first — invoice and DC numbers are assigned on save.
+                </Text>
+              ) : null}
 
               <Text style={styles.sectionLabel}>Transaction History</Text>
             </View>
           }
-          renderItem={({ item }) => <TransactionRow tx={item} />}
+          renderItem={({ item }) => <TransactionRow tx={item} onPress={() => openExport(item)} />}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListEmptyComponent={<Text style={styles.emptyState}>No transactions recorded for this party yet.</Text>}
         />
       )}
+      <ExportDocumentSheet
+        transaction={exportTarget}
+        exporting={exporting}
+        error={exportError}
+        onExport={handleExport}
+        onClose={() => setExportTarget(null)}
+      />
     </View>
   );
 }
@@ -157,10 +206,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: 'center',
   },
+  generateDisabled: {
+    opacity: 0.5,
+  },
   generateLabel: {
     ...typography.body,
     fontWeight: '500',
     color: colors.white,
+  },
+  generateHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   sectionLabel: {
     ...typography.body,

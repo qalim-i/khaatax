@@ -10,6 +10,7 @@ import { SegmentedControl, type Segment } from '@/components/ui/segmented-contro
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useExpenseDashboard, type ExpensePeriod } from '@/hooks/use-expense-dashboard';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 import { formatCurrency } from '@/lib/format';
 
 const PERIODS: readonly Segment<ExpensePeriod>[] = [
@@ -27,6 +28,8 @@ const PERIOD_CAPTION: Record<ExpensePeriod, string> = {
 export default function ExpenseDashboardScreen() {
   const { totals, byCategory, trend, period, setPeriod, periodStart, loading, error, refresh } =
     useExpenseDashboard();
+
+  useRefreshOnFocus(refresh);
 
   const periodTotal = totals[period];
 

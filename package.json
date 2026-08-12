@@ -11,11 +11,14 @@
     "expo-constants": "~57.0.10",
     "expo-dev-client": "~57.0.11",
     "expo-device": "~57.0.1",
+    "expo-file-system": "~57.0.2",
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.2",
     "expo-linking": "~57.0.5",
+    "expo-print": "~57.0.1",
     "expo-router": "~57.0.12",
+    "expo-sharing": "~57.0.11",
     "expo-splash-screen": "~57.0.6",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
@@ -35,7 +38,10 @@
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
+    "jest": "^29.7.0",
+    "jest-expo": "^57.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -44,7 +50,58 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "jest --selectProjects unit",
+    "test:rls": "jest --selectProjects rls --runInBand"
+  },
+  "jest": {
+    "projects": [
+      {
+        "displayName": "unit",
+        "preset": "jest-expo/node",
+        "testMatch": [
+          "<rootDir>/src/**/*.test.ts"
+        ],
+        "transform": {
+          "^.+\\.[jt]sx?$": [
+            "babel-jest",
+            {
+              "presets": [
+                "babel-preset-expo"
+              ]
+            }
+          ]
+        },
+        "moduleNameMapper": {
+          "^@/assets/(.*)$": "<rootDir>/assets/$1",
+          "^@/(.*)$": "<rootDir>/src/$1"
+        }
+      },
+      {
+        "displayName": "rls",
+        "preset": "jest-expo/node",
+        "testMatch": [
+          "<rootDir>/tests/**/*.test.ts"
+        ],
+        "setupFiles": [
+          "<rootDir>/tests/setup-env.ts"
+        ],
+        "transform": {
+          "^.+\\.[jt]sx?$": [
+            "babel-jest",
+            {
+              "presets": [
+                "babel-preset-expo"
+              ]
+            }
+          ]
+        },
+        "moduleNameMapper": {
+          "^@/assets/(.*)$": "<rootDir>/assets/$1",
+          "^@/(.*)$": "<rootDir>/src/$1"
+        }
+      }
+    ]
   },
   "private": true
 }

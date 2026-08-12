@@ -9,6 +9,7 @@ import { SegmentedControl, type Segment } from '@/components/ui/segmented-contro
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useOutstanding } from '@/hooks/use-outstanding';
+import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 import { toIsoDate } from '@/lib/date';
 import { formatDisplayDate } from '@/lib/format';
 
@@ -34,7 +35,10 @@ export default function OutstandingReportScreen() {
     activeFilterCount,
     loading,
     error,
+    refresh,
   } = useOutstanding();
+
+  useRefreshOnFocus(refresh);
 
   const [picking, setPicking] = useState<'from' | 'to' | null>(null);
 
