@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
+import { logError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { AppUser } from '@/types/db';
 
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       .then(async ({ data, error }) => {
         if (cancelled) return;
         if (error) {
-          console.error('Failed to load app user profile', error);
+          logError('AuthProvider.loadProfile', error);
           setAppUser(null);
 
           // A stored session whose token the server no longer accepts (revoked,
@@ -70,6 +71,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
           // "signed out". Drop to the sign-in screen instead.
           if (isAuthError(error)) {
             await supabase.auth.signOut({ scope: 'local' });
+            // The await yields, so this effect may have been torn down while the
+            // sign-out was in flight — a newer session, or an unmount. The entry
+            // check is stale by now; without re-checking, a superseded run can
+            // null out a session that has since been replaced.
+            if (cancelled) return;
             setSession(null);
           }
         } else {

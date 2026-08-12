@@ -3,6 +3,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, Te
 
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { colors, spacing, typography } from '@/constants/design-tokens';
+import { logError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 
 // No Figma frame exists for login (GEN-2 has no Phase 1 design source) — this is a
@@ -19,7 +20,14 @@ export function SignInScreen() {
     setLoading(true);
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (signInError) setError(signInError.message);
+    // GoTrue's own messages are kept here rather than routed through
+    // toUserMessage: "Invalid login credentials" is deliberately worded not to
+    // reveal whether the address exists, and rewriting it would only make a
+    // failed sign-in harder to act on. The detail still goes to the dev log.
+    if (signInError) {
+      logError('SignInScreen', signInError);
+      setError(signInError.message);
+    }
   }
 
   return (

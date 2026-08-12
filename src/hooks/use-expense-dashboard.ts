@@ -8,6 +8,7 @@ import {
   startOfYearIso,
   toIsoDate,
 } from '@/lib/date';
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 
 const TREND_MONTHS = 12;
@@ -66,7 +67,8 @@ export function useExpenseDashboard() {
       if (queryError) throw queryError;
       setRecords((data as ExpenseRecord[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load expenses');
+      logError('useExpenseDashboard', err);
+      setError(toUserMessage(err, 'Could not load the expense dashboard.'));
     } finally {
       setLoading(false);
     }

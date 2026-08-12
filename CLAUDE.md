@@ -49,14 +49,21 @@ If a task seems to require any of the above, stop and ask rather than implementi
 `users`, `parties`, `transactions`, `stock`, `expenses`, `employees`
 
 - `employees` is the only table restricted to the `owner` role via RLS.
-- All other tables: both `owner` and `manager` have full read/write.
+- All other tables: both `owner` and `manager` have read access.
+- Write access is narrower than "full" as of migration `0007` (security hardening):
+  - `transactions` and `stock` are **read-only** to end users. All writes go through the
+    `create_transaction` / `adjust_stock` functions.
+  - `parties.balance` is not writable by anyone — it moves only via `create_transaction`.
+  - `expenses` are editable/deletable only by whoever logged them (the owner keeps full
+    access). Attribution is unenforceable otherwise. **This narrows the original
+    "full read/write" rule** and is deliberate; see `0007` for the reasoning.
 - `transactions.invoice_no` and `transactions.dc_no` come from two **independent** Postgres sequences (`invoice_no_seq`, `dc_no_seq`), generated server-side — never client-side, to avoid collisions from concurrent writes.
 
 ## Non-Negotiable Rules
 
 1. **Payroll isolation is enforced by RLS, not the UI.** Any change touching the `employees` table must include/update an RLS policy and a test proving a `manager`-role query returns zero rows.
-2. **Invoice/DC numbers are always server-generated**, via `nextval()` on their respective sequences inside a single atomic transaction alongside the stock/balance update. Never assign these numbers in client code.
-3. **New Transaction must be atomic**: transaction insert, party balance update, and stock quantity update happen together or not at all.
+2. **Invoice/DC numbers are always server-generated**, via `nextval()` on their respective sequences inside a single atomic transaction alongside the stock/balance update. Never assign these numbers in client code. Since `0007` this is enforced by the database (no client INSERT grant on `transactions`), not just by convention — `tests/rls-write-paths.test.ts` proves it.
+3. **New Transaction must be atomic**: transaction insert, party balance update, and stock quantity update happen together or not at all. `create_transaction` is `security definer` and is the only write path, so this is no longer skippable by calling PostgREST directly.
 4. Don't add offline handling, scanning, approval workflows, or HR features "for completeness" — they're deliberately excluded (see Out of Scope above).
 
 ## Conventions
@@ -78,6 +85,39 @@ Also added outside the original phase plan: party creation (Add Party on the Par
 - Migration `0005_fix_role_claim.sql` and `0006_auth_admin_reads_roles.sql` are applied and the Custom Access Token Hook is enabled. `app_role` reaches the JWT and role-based policies evaluate correctly.
 - **The payroll boundary is proven.** `npm run test:rls` is fully green (9/9), including the three owner-side controls that previously failed. The manager-denial assertions are now meaningful rather than vacuous.
 
+**Security hardening pass (post-Phase 4):** migration `0007_write_path_hardening.sql`.
+An audit found that Non-Negotiable Rules 2 and 3 held only because the client chose to
+call the RPC — a signed-in manager could POST directly to PostgREST with a forged
+`invoice_no`, misattribute the row via `created_by`, and skip the balance/stock update.
+The trust boundary moved from the sign-in screen to the table:
+
+- Direct writes to `transactions` / `stock` revoked; RPCs are `security definer` with
+  their own role checks and pinned `search_path`.
+- `created_by` stamped by a column DEFAULT, not sent by the client.
+- `parties.balance` removed from the UPDATE grant.
+- Quantity `CHECK` constraints; RPC validates before `nextval()` so failed writes no
+  longer burn invoice numbers.
+- Raw PostgREST errors no longer reach the UI — see `src/lib/errors.ts`.
+
+Payroll RLS is unchanged. `tests/rls-write-paths.test.ts` covers the new boundaries and
+runs under `npm run test:rls` alongside the payroll suite.
+
+**Review follow-ups:** migration `0008_write_path_followups.sql` closes three gaps a
+review found in `0007`:
+
+- `create_transaction` now takes `FOR UPDATE` on the filled-stock row (concurrent callers
+  could both pass the sufficiency check and both decrement) and rejects a missing stock
+  row explicitly (`NULL < n` is `NULL`, so it fell through the guard).
+- `parties` INSERT is now column-scoped like UPDATE already was — `balance` was still
+  settable at creation time.
+- User-facing RPC messages carry SQLSTATE `KX001` instead of relying on `P0001`, which is
+  the default for *any* bare `raise exception` and so passed arbitrary internal text to
+  the screen. `src/lib/errors.ts` keys on `KX001`; **apply `0008` before shipping a build
+  with it.**
+
+`toUserMessage` also takes `unknown` rather than `Error` — a thrown primitive used to
+crash the handler that was supposed to contain it.
+
 **Still outstanding:**
 - The owner web view (PRD GEN-3) was deliberately deferred — not built. This is the last unbuilt "Should" in the PRD.
 - PDF export covers Invoice and Delivery Challan only (PRD INV-5). Stock-summary and report exports were considered in Phase 4 and left out — no PRD story calls for them. The Export button on the Stock screen says so rather than promising one.
@@ -92,7 +132,12 @@ Also added outside the original phase plan: party creation (Add Party on the Par
 ## Testing
 
 - `npm test` — unit tests (pure logic in `src/lib`). No database, no credentials.
-- `npm run test:rls` — payroll RLS boundary against a real Supabase project. Requires the `KHAATAX_TEST_*` credentials in `.env.example`. Fails loudly rather than skipping when they're absent, by design.
+- `npm run test:rls` — payroll RLS boundary **and** the write-path boundaries from `0007`,
+  against a real Supabase project. Requires the `KHAATAX_TEST_*` credentials in
+  `.env.example`. Fails loudly rather than skipping when they're absent, by design.
+- These tests WRITE (probe rows in `employees`, `expenses`, `parties`), so they take their
+  own `KHAATAX_TEST_SUPABASE_URL` and refuse to run against the project the app is pointed
+  at unless `KHAATAX_TEST_ALLOW_SHARED_PROJECT=true`. Split the projects when you can.
 
 Any change touching `employees` must re-run `test:rls` (Non-Negotiable Rule 1).
 

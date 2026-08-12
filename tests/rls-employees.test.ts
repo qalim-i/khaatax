@@ -6,14 +6,8 @@
  * Supabase project because RLS is the thing under test — mocking the client
  * would prove nothing.
  *
- * Required environment (point these at the DEVELOPMENT project, never Production):
- *
- *   EXPO_PUBLIC_SUPABASE_URL        already in .env
- *   EXPO_PUBLIC_SUPABASE_ANON_KEY   already in .env
- *   KHAATAX_TEST_OWNER_EMAIL        an owner-role account
- *   KHAATAX_TEST_OWNER_PASSWORD
- *   KHAATAX_TEST_MANAGER_EMAIL      a manager-role account
- *   KHAATAX_TEST_MANAGER_PASSWORD
+ * Credentials, the guard against running this on the app's own project, and the
+ * sign-in/sign-out plumbing all live in ./support/clients.
  *
  * Run with: npm run test:rls
  *
@@ -22,59 +16,21 @@
  * it would go green in CI while proving nothing.
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-const OWNER_EMAIL = process.env.KHAATAX_TEST_OWNER_EMAIL;
-const OWNER_PASSWORD = process.env.KHAATAX_TEST_OWNER_PASSWORD;
-const MANAGER_EMAIL = process.env.KHAATAX_TEST_MANAGER_EMAIL;
-const MANAGER_PASSWORD = process.env.KHAATAX_TEST_MANAGER_PASSWORD;
-
-function requireEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(
-      `${name} is not set. The payroll RLS test cannot run without real credentials — ` +
-        'see the header of tests/rls-employees.test.ts.'
-    );
-  }
-  return value;
-}
-
-async function signIn(email: string, password: string): Promise<SupabaseClient> {
-  const client = createClient(
-    requireEnv('EXPO_PUBLIC_SUPABASE_URL', SUPABASE_URL),
-    requireEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY', SUPABASE_ANON_KEY),
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  );
-
-  const { error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(`Could not sign in as ${email}: ${error.message}`);
-  return client;
-}
+import { signInAsManager, signInAsOwner, signOutAll } from './support/clients';
 
 describe('employees RLS', () => {
   let manager: SupabaseClient;
   let owner: SupabaseClient;
 
   beforeAll(async () => {
-    manager = await signIn(
-      requireEnv('KHAATAX_TEST_MANAGER_EMAIL', MANAGER_EMAIL),
-      requireEnv('KHAATAX_TEST_MANAGER_PASSWORD', MANAGER_PASSWORD)
-    );
-    owner = await signIn(
-      requireEnv('KHAATAX_TEST_OWNER_EMAIL', OWNER_EMAIL),
-      requireEnv('KHAATAX_TEST_OWNER_PASSWORD', OWNER_PASSWORD)
-    );
+    manager = await signInAsManager();
+    owner = await signInAsOwner();
   }, 30_000);
 
   afterAll(async () => {
-    // `scope: 'local'` matters. signOut() defaults to global scope, which revokes
-    // every session for that user — including the developer's own browser session
-    // in the running app, which then can't refresh and has to sign in again.
-    // Local scope tears down only the session this test created.
-    await manager?.auth.signOut({ scope: 'local' });
-    await owner?.auth.signOut({ scope: 'local' });
+    await signOutAll(manager, owner);
   });
 
   // ---------------------------------------------------------------------------

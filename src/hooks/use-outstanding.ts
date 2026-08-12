@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { computeOutstanding, type OutstandingTransactionInput } from '@/lib/outstanding';
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
 
@@ -72,7 +73,8 @@ export function useOutstanding() {
       setParties((partiesRes.data as Party[]) ?? []);
       setTransactions((txRes.data as OutstandingTransactionInput[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load outstanding report');
+      logError('useOutstanding', err);
+      setError(toUserMessage(err, 'Could not load the outstanding report.'));
     } finally {
       setLoading(false);
     }

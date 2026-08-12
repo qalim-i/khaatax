@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { startOfMonthIso } from '@/lib/date';
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
 
@@ -43,7 +44,8 @@ export function usePartyLedger() {
       setRows(combined);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load parties');
+      logError('usePartyLedger', err);
+      setError(toUserMessage(err, 'Could not load the party ledger.'));
     } finally {
       setLoading(false);
     }

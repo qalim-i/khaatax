@@ -193,7 +193,7 @@ export function buildInvoiceHtml(party: Party, tx: Transaction): string {
         </tr>
         <tr class="emphasis">
           <td class="label">Cylinder Balance Outstanding</td>
-          <td class="value">${party.balance}</td>
+          <td class="value">${escapeHtml(String(party.balance))}</td>
         </tr>
       </tbody>
     </table>

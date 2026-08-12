@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { AppUser } from '@/types/db';
 
@@ -24,7 +25,8 @@ export function useAppUsers() {
       .then(({ data, error: fetchError }) => {
         // Silently dropping this made every name resolve to 'Unknown' with no
         // indication that the lookup had failed rather than come back empty.
-        setError(fetchError ? fetchError.message : null);
+        if (fetchError) logError('useAppUsers', fetchError);
+        setError(fetchError ? toUserMessage(fetchError, 'Could not load the staff list.') : null);
         setUsers((data as AppUser[]) ?? []);
         setLoading(false);
       });

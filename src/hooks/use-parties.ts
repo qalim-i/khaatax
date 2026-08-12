@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
 
@@ -19,7 +20,8 @@ export function useParties() {
     try {
       const { data, error: fetchError } = await supabase.from('parties').select('*').order('name');
       if (fetchError) {
-        setError(fetchError.message);
+        logError('useParties', fetchError);
+        setError(toUserMessage(fetchError, 'Could not load parties.'));
         setParties([]);
         return;
       }
@@ -27,7 +29,8 @@ export function useParties() {
       setError(null);
       setParties((data as Party[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load parties.');
+      logError('useParties', err);
+      setError(toUserMessage(err, 'Could not load parties.'));
       setParties([]);
     } finally {
       setLoading(false);

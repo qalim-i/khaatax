@@ -53,6 +53,7 @@ export default function OutstandingReportScreen() {
         leftIconRotation={180}
         onLeftPress={() => router.back()}
         rightIcon="account"
+        onRightPress={() => router.push('/profile')}
       />
       <FlatList
         data={rows}

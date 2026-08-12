@@ -128,7 +128,7 @@ export function HomeDashboard() {
           icon={<Icon name="refresh" width={18} height={18} color={colors.textPrimary} />}
           title="Recent Activity"
         />
-        <View style={styles.activityList}>
+        <View>
           {items.length === 0 ? (
             <Text style={styles.activityEmpty}>Nothing recorded yet.</Text>
           ) : (
@@ -191,9 +191,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
-  },
-  activityList: {
-    gap: 0,
   },
   activityEmpty: {
     ...typography.body,

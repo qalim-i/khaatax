@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Expense } from '@/types/db';
 
@@ -48,7 +49,8 @@ export function useExpenses(initialFilters: Partial<ExpenseFilters> = {}) {
       if (queryError) throw queryError;
       setExpenses((data as Expense[]) ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load expenses');
+      logError('useExpenses', err);
+      setError(toUserMessage(err, 'Could not load expenses.'));
     } finally {
       setLoading(false);
     }

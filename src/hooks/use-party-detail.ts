@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Party, Transaction } from '@/types/db';
 
@@ -33,7 +34,8 @@ export function usePartyDetail(partyId: string) {
       setTransactions(withBalance.reverse());
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load party');
+      logError('usePartyDetail', err);
+      setError(toUserMessage(err, 'Could not load this party.'));
     } finally {
       setLoading(false);
     }

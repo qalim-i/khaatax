@@ -50,8 +50,12 @@ export default function AddExpenseScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Dismisses downward — a modal opened from Home or the Expenses dashboard. */}
-      <TopAppBar title="Add Expense" leftIcon="chevron-down" onLeftPress={() => router.back()} />
+      <TopAppBar
+        title="KhaataX"
+        leftIcon="chevron-right"
+        leftIconRotation={180}
+        onLeftPress={() => router.back()}
+      />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.headerBlock}>
           <Text style={styles.h1}>Add Expense</Text>

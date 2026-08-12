@@ -71,12 +71,12 @@ export default function NewTransactionScreen() {
 
   return (
     <View style={styles.container}>
-      {/*
-        A modal, so the affordance dismisses downward rather than pointing "back" at a
-        screen in a stack — this route is reachable from Home and from the Cylinders
-        menu, and returns to whichever one opened it.
-      */}
-      <TopAppBar title="New Transaction" leftIcon="chevron-down" onLeftPress={() => router.back()} />
+      <TopAppBar
+        title="KhaataX"
+        leftIcon="chevron-right"
+        leftIconRotation={180}
+        onLeftPress={() => router.back()}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerBlock}>
           <Text style={styles.h1}>New Transaction</Text>

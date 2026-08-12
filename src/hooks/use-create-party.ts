@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { PartyInput } from '@/types/db';
 
@@ -26,9 +27,11 @@ export function useCreateParty() {
 
     try {
       const { error } = await supabase.from('parties').insert(input);
-      return error ? error.message : null;
+      if (error) logError('useCreateParty', error);
+      return error ? toUserMessage(error, 'Could not create the party.') : null;
     } catch (err) {
-      return err instanceof Error ? err.message : 'Could not create party.';
+      logError('useCreateParty', err);
+      return toUserMessage(err, 'Could not create the party.');
     } finally {
       setSubmitting(false);
     }

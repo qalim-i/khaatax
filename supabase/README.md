@@ -14,6 +14,41 @@ In the Supabase dashboard's **SQL Editor**, run the files in `migrations/` **in 
 4. `0004_expense_reporting.sql` — staff-directory read policy on `users`, plus reporting indexes
 5. `0005_fix_role_claim.sql` — **required.** Moves the app role onto a non-reserved `app_role` JWT claim and repoints every RLS policy at it. Without this the policies deny every user (see Troubleshooting below).
 6. `0006_auth_admin_reads_roles.sql` — **required.** Lets `supabase_auth_admin` read `public.users` so the hook can actually find the role. `0005` alone is not enough: the hook is subject to RLS and would silently attach no claim.
+7. `0007_write_path_hardening.sql` — **required.** Closes the direct write paths.
+   Before it, RLS granted `for all` on `transactions`, so a signed-in manager could
+   POST straight to PostgREST with a hand-picked `invoice_no`, attribute the row to
+   someone else, and skip the balance and stock updates — the atomic RPC was enforced
+   only by the client choosing to call it. After it:
+
+   * `transactions` and `stock` are **read-only** to end users. Writes go through the
+     `create_transaction` and `adjust_stock` functions, which are now `security definer`
+     with their own role checks and a pinned `search_path`.
+   * `created_by` is stamped by a column DEFAULT of `auth.uid()` and is no longer
+     insertable by the client, so attribution cannot be forged.
+   * `parties.balance` is removed from the UPDATE grant — it moves only via the RPC.
+   * Quantities get `CHECK` constraints, and `create_transaction` validates its
+     arguments **before** calling `nextval()`, so a rejected write no longer burns an
+     invoice number.
+   * `expenses` UPDATE/DELETE narrow to your own rows (the owner keeps full access).
+
+   This one needs no sign-out afterwards — no claims change.
+
+8. `0008_write_path_followups.sql` — **required.** Three gaps left in `0007`:
+
+   * `create_transaction` read the filled-stock row without `FOR UPDATE`, so two
+     concurrent calls could both pass the sufficiency check and both decrement —
+     overselling the stock the check exists to protect. It also treated a *missing*
+     stock row as sufficient, because `NULL < n` is `NULL`, not `false`.
+   * `parties` had column-level UPDATE grants but a table-level INSERT grant, so
+     `balance` was still client-settable at creation time — the same derived column
+     `0007` locked down for UPDATE.
+   * User-facing RPC messages were identified by SQLSTATE `P0001`, the default for
+     *any* bare `raise exception` in the database. They now carry `KX001`, so only
+     messages we deliberately marked reach the screen.
+
+   **Apply this before shipping an app build containing the matching `src/lib/errors.ts`
+   change**, or stock and validation failures will show generic fallback text instead
+   of the specific reason. No sign-out needed.
 
 ## 3. Enable the Custom Access Token Hook
 

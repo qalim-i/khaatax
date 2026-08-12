@@ -28,7 +28,7 @@ export default function PartyLedgerScreen() {
 
   return (
     <View style={styles.container}>
-      <TopAppBar title="KhaataX" leftIcon="chevron-right" leftIconRotation={180} onLeftPress={() => router.back()} rightIcon="account" />
+      <TopAppBar title="KhaataX" leftIcon="chevron-right" leftIconRotation={180} onLeftPress={() => router.back()} rightIcon="account" onRightPress={() => router.push('/profile')} />
       <FlatList
         data={rows}
         keyExtractor={(item) => item.party.id}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 
 export interface ActivityItem {
@@ -49,7 +50,8 @@ export function useRecentActivity(limit = 5) {
       // A denied read comes back as an error with no rows. Without this the feed
       // renders empty and indistinguishable from "nothing has happened yet".
       const failure = txRes.error ?? expRes.error;
-      setError(failure ? failure.message : null);
+      if (failure) logError('useRecentActivity', failure);
+      setError(failure ? toUserMessage(failure, 'Could not load recent activity.') : null);
 
       const txItems: ActivityItem[] = (txRes.data ?? []).map((t: any) => ({
         id: `tx-${t.id}`,
@@ -77,7 +79,8 @@ export function useRecentActivity(limit = 5) {
       setItems(merged);
     } catch (err) {
       if (requestId === requestIdRef.current) {
-        setError(err instanceof Error ? err.message : 'Failed to load activity.');
+        logError('useRecentActivity', err);
+        setError(toUserMessage(err, 'Could not load recent activity.'));
         setItems([]);
       }
     } finally {

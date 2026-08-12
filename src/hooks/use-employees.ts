@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { summarisePayroll } from '@/lib/payroll';
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Employee, EmployeeInput } from '@/types/db';
 
@@ -24,7 +25,8 @@ export function useEmployees() {
     setLoading(true);
     const { data, error: fetchError } = await supabase.from('employees').select('*').order('name');
     if (fetchError) {
-      setError(fetchError.message);
+      logError('useEmployees.load', fetchError);
+      setError(toUserMessage(fetchError, 'Could not load the payroll list.'));
     } else {
       setError(null);
       setEmployees((data as Employee[]) ?? []);
@@ -40,7 +42,8 @@ export function useEmployees() {
     async (input: EmployeeInput) => {
       const { error: insertError } = await supabase.from('employees').insert(input);
       if (insertError) {
-        setError(insertError.message);
+        logError('useEmployees.create', insertError);
+        setError(toUserMessage(insertError, 'Could not add the employee.'));
         return false;
       }
       await load();
@@ -53,7 +56,8 @@ export function useEmployees() {
     async (id: string, input: EmployeeInput) => {
       const { error: updateError } = await supabase.from('employees').update(input).eq('id', id);
       if (updateError) {
-        setError(updateError.message);
+        logError('useEmployees.update', updateError);
+        setError(toUserMessage(updateError, 'Could not save the employee.'));
         return false;
       }
       await load();
@@ -67,7 +71,8 @@ export function useEmployees() {
     async (id: string, active: boolean) => {
       const { error: updateError } = await supabase.from('employees').update({ active }).eq('id', id);
       if (updateError) {
-        setError(updateError.message);
+        logError('useEmployees.setActive', updateError);
+        setError(toUserMessage(updateError, 'Could not update the employee.'));
         return false;
       }
       await load();

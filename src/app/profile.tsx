@@ -18,7 +18,12 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <TopAppBar title="Profile" leftIcon="chevron-down" onLeftPress={() => router.back()} />
+      <TopAppBar
+        title="Profile"
+        leftIcon="chevron-right"
+        leftIconRotation={180}
+        onLeftPress={() => router.back()}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.accountCard}>
           <Text style={styles.accountName}>{appUser?.name ?? 'Signed in'}</Text>

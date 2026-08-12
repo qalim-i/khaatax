@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { startOfMonthIso } from '@/lib/date';
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Stock } from '@/types/db';
 
@@ -48,7 +49,8 @@ export function useHomeDashboard(includePayroll: boolean) {
         payrollMonthlyTotal,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      logError('useHomeDashboard', err);
+      setError(toUserMessage(err, 'Could not load the dashboard.'));
     } finally {
       setLoading(false);
     }

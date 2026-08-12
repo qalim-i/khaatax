@@ -53,6 +53,7 @@ function PayrollAppBar() {
       leftIconRotation={180}
       onLeftPress={() => router.back()}
       rightIcon="account"
+      onRightPress={() => router.push('/profile')}
     />
   );
 }

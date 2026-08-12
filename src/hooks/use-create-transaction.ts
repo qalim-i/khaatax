@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { CreateTransactionInput, Transaction } from '@/types/db';
 
@@ -31,8 +32,10 @@ export function useCreateTransaction() {
     });
     setSubmitting(false);
     if (rpcError) {
-      setError(rpcError.message);
-      return { transaction: null, error: rpcError.message };
+      logError('useCreateTransaction', rpcError);
+      const message = toUserMessage(rpcError, 'Could not save the transaction.');
+      setError(message);
+      return { transaction: null, error: message };
     }
     return { transaction: data as Transaction, error: null };
   }
