@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, spacing, typography } from '@/constants/design-tokens';
 import { Icon, type IconName } from '@/components/ui/icon';
@@ -20,8 +21,12 @@ export function TopAppBar({
   rightIcon,
   onRightPress,
 }: TopAppBarProps) {
+  // The bar is the topmost chrome on every screen, so it has to clear the status
+  // bar / notch itself — nothing above it does.
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { height: BAR_HEIGHT + insets.top, paddingTop: insets.top }]}>
       <Pressable style={styles.iconButton} onPress={onLeftPress} disabled={!onLeftPress} hitSlop={8}>
         {leftIcon ? (
           <Icon
@@ -44,9 +49,11 @@ export function TopAppBar({
   );
 }
 
+const BAR_HEIGHT = 56;
+
 const styles = StyleSheet.create({
   bar: {
-    height: 48,
+    height: BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

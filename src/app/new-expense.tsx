@@ -127,7 +127,9 @@ export default function AddExpenseScreen() {
               style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={!canSubmit}>
-              <Text style={styles.submitLabel}>{submitting ? 'Saving...' : 'Log Expense'}</Text>
+              <Text style={styles.submitLabel} numberOfLines={1}>
+                {submitting ? 'Saving...' : 'Log Expense'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -222,18 +224,20 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     textAlignVertical: 'top',
   },
+  // Same shrink/grow split as New Transaction — see the note there.
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingTop: spacing.sm,
   },
   cancelButton: {
+    flexShrink: 1,
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: radius.sm,
     height: 48,
-    paddingHorizontal: spacing.lg - 1,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -243,10 +247,12 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   submitButton: {
+    flex: 1,
+    minWidth: 0,
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
     height: 48,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

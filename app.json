@@ -4,11 +4,10 @@
     "slug": "khaatax",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/khataX_icon.png",
     "scheme": "khaatax",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.qalimfi.khaatax",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -16,17 +15,16 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#082722",
+        "foregroundImage": "./assets/images/khataX_adaptive_foreground.png",
+        "monochromeImage": "./assets/images/khataX_monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.qalimfi.khaatax"
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/khataX_favicon.png"
     },
     "plugins": [
       "expo-router",

@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/ui/icon';
 import { colors } from '@/constants/design-tokens';
@@ -10,7 +11,20 @@ function TabIcon(name: IconName) {
   );
 }
 
+/*
+  56px had to hold icon + label + the gesture bar's inset, which squeezed the icons.
+  The bar is now 64px of content plus whatever the device reserves at the bottom.
+
+  Only `paddingBottom` is set, and only to the inset: react-navigation lays the icon
+  and label out inside whatever vertical space the style leaves it, so any padding of
+  our own is taken straight out of the label's box — on web that clipped the labels to
+  a 7px sliver of a 12px font.
+*/
+const TAB_BAR_CONTENT_HEIGHT = 64;
+
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -20,7 +34,8 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 56,
+          height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingBottom: insets.bottom,
         },
         tabBarLabelStyle: {
           fontSize: 12,

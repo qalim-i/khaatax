@@ -168,7 +168,9 @@ export default function NewTransactionScreen() {
               style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={!canSubmit}>
-              <Text style={styles.submitLabel}>{submitting ? 'Saving...' : 'Submit Transaction'}</Text>
+              <Text style={styles.submitLabel} numberOfLines={1}>
+                {submitting ? 'Saving...' : 'Submit Transaction'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -276,18 +278,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textPrimary,
   },
+  /*
+    Both buttons used to size to their own text with fixed horizontal padding, so
+    "Submit Transaction" pushed the row past the card edge on narrow screens.
+    Cancel now keeps its intrinsic width but may shrink; Submit takes the rest.
+  */
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
     paddingTop: spacing.sm,
   },
   cancelButton: {
+    flexShrink: 1,
     borderWidth: 1,
     borderColor: colors.primary,
     borderRadius: radius.sm,
     height: 48,
-    paddingHorizontal: spacing.lg - 1,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -297,10 +305,12 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   submitButton: {
+    flex: 1,
+    minWidth: 0,
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
     height: 48,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
