@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MenuLinkCard } from '@/components/ui/menu-link-card';
 import { TopAppBar } from '@/components/ui/top-app-bar';
-import { colors, radius, spacing, typography } from '@/constants/design-tokens';
+import { colors, spacing, typography } from '@/constants/design-tokens';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function MoreScreen() {
-  const { appUser, signOut } = useAuth();
+  const { appUser } = useAuth();
   const isOwner = appUser?.role === 'owner';
 
   return (
@@ -33,20 +33,24 @@ export default function MoreScreen() {
           </View>
         ) : null}
 
-        <View style={styles.phaseBlock}>
-          <Text style={styles.phase}>Exports</Text>
-          <Text style={styles.description}>
-            Invoice and Delivery Challan PDFs are generated from a party&apos;s transaction
-            history — open Cylinders → Party Ledger, pick a party, then tap a transaction.
-          </Text>
+        {/*
+          Was a paragraph spelling out "Cylinders → Party Ledger → pick a party" in
+          words. If the screen knows the route, it should offer it.
+        */}
+        <View style={styles.cards}>
+          <MenuLinkCard
+            icon="export"
+            iconSize={{ width: 24, height: 24 }}
+            title="Invoice & Delivery Challan"
+            description="Open a party, then tap a transaction to generate and share its PDF."
+            onPress={() => router.navigate('/cylinders/parties')}
+          />
         </View>
 
-        <View style={styles.accountCard}>
-          <Text style={styles.accountName}>{appUser?.name ?? 'Signed in'}</Text>
-          <Text style={styles.accountRole}>{appUser?.role}</Text>
-          <Pressable style={styles.signOutButton} onPress={signOut}>
-            <Text style={styles.signOutLabel}>Sign Out</Text>
-          </Pressable>
+        {/* A note, not a control — deliberately not a card, so it isn't tappable. */}
+        <View style={styles.settingsBlock}>
+          <Text style={styles.settingsTitle}>Settings</Text>
+          <Text style={styles.settingsDescription}>Settings will come soon.</Text>
         </View>
       </ScrollView>
     </View>
@@ -65,51 +69,21 @@ const styles = StyleSheet.create({
   cards: {
     gap: spacing.lg,
   },
-  phaseBlock: {
+  settingsBlock: {
     // Deliberately not `alignItems: 'center'` — that shrink-wraps children to
     // their natural width, so a long line pushes the whole column wider than the
     // screen instead of wrapping. The two Texts centre themselves via textAlign.
     gap: spacing.xxs,
   },
-  phase: {
+  settingsTitle: {
     ...typography.h3,
     fontWeight: '600',
     color: colors.primary,
     textAlign: 'center',
   },
-  description: {
+  settingsDescription: {
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
-  },
-  accountCard: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xxs,
-  },
-  accountName: {
-    ...typography.bodyLarge,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  accountRole: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textTransform: 'capitalize',
-    marginBottom: spacing.sm,
-  },
-  signOutButton: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-  },
-  signOutLabel: {
-    ...typography.body,
-    fontWeight: '500',
-    color: colors.danger,
   },
 });

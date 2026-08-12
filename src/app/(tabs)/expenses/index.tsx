@@ -45,7 +45,7 @@ export default function ExpenseDashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <TopAppBar title="KhaataX" rightIcon="account" />
+      <TopAppBar title="KhaataX" rightIcon="account" onRightPress={() => router.push('/profile')} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={colors.primary} />}>
@@ -82,7 +82,7 @@ export default function ExpenseDashboardScreen() {
           </View>
 
           <View style={styles.actionsRow}>
-            <Pressable style={styles.addButton} onPress={() => router.push('/expenses/new')}>
+            <Pressable style={styles.addButton} onPress={() => router.push('/new-expense')}>
               <Icon name="plus" width={14} height={14} color={colors.white} />
               <Text style={styles.addLabel}>Add Expense</Text>
             </Pressable>

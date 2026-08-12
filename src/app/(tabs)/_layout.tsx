@@ -10,7 +10,7 @@ function TabIcon(name: IconName) {
   );
 }
 
-export default function AppTabs() {
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{

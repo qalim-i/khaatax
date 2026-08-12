@@ -8,7 +8,7 @@ import { colors, spacing, typography } from '@/constants/design-tokens';
 export default function CylinderMenuScreen() {
   return (
     <View style={styles.container}>
-      <TopAppBar title="KhaataX" leftIcon="menu" rightIcon="account" />
+      <TopAppBar title="KhaataX" rightIcon="account" onRightPress={() => router.push('/profile')} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerBlock}>
           <Text style={styles.h2}>Cylinder Management</Text>
@@ -42,7 +42,7 @@ export default function CylinderMenuScreen() {
             iconSize={{ width: 25, height: 25 }}
             title="New Transaction"
             description="Record new cylinder deliveries, empty returns, and cash receipts."
-            onPress={() => router.push('/cylinders/new-transaction')}
+            onPress={() => router.push('/new-transaction')}
             highlighted
           />
         </View>

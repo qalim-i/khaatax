@@ -1,7 +1,7 @@
+import { router } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { ManagerDashboard } from '@/components/home/manager-dashboard';
-import { OwnerDashboard } from '@/components/home/owner-dashboard';
+import { HomeDashboard } from '@/components/home/home-dashboard';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors } from '@/constants/design-tokens';
 import { useAuth } from '@/hooks/use-auth';
@@ -11,15 +11,18 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <TopAppBar title="KhaataX" leftIcon="menu" rightIcon="account" />
+      {/*
+        No hamburger: there is no drawer, so it rendered permanently disabled. The
+        person icon now opens the Profile modal instead of sitting inert while the
+        account details lived at the bottom of the More tab.
+      */}
+      <TopAppBar title="KhaataX" rightIcon="account" onRightPress={() => router.push('/profile')} />
       {loading || !appUser ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} />
         </View>
-      ) : appUser.role === 'owner' ? (
-        <OwnerDashboard />
       ) : (
-        <ManagerDashboard />
+        <HomeDashboard />
       )}
     </View>
   );

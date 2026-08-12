@@ -9,6 +9,7 @@ import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useCreateTransaction } from '@/hooks/use-create-transaction';
 import { notify } from '@/lib/dialog';
+import { parseQuantity } from '@/lib/quantity';
 import { useParties } from '@/hooks/use-parties';
 import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
 
@@ -34,16 +35,31 @@ export default function NewTransactionScreen() {
   const [filledSent, setFilledSent] = useState('0');
   const [emptyReceived, setEmptyReceived] = useState('0');
 
-  const canSubmit = !!partyId && cylinderType.trim().length > 0 && !submitting;
+  const filledQty = parseQuantity(filledSent);
+  const emptyQty = parseQuantity(emptyReceived);
+  const quantitiesAreNumbers = filledQty !== null && emptyQty !== null;
+  const movesAtLeastOne = quantitiesAreNumbers && filledQty + emptyQty > 0;
+
+  const quantityError = !quantitiesAreNumbers
+    ? 'Quantities must be whole numbers, zero or more.'
+    : !movesAtLeastOne
+      ? 'A transaction has to move at least one cylinder.'
+      : null;
+
+  const canSubmit =
+    !!partyId && cylinderType.trim().length > 0 && movesAtLeastOne && !submitting;
 
   async function handleSubmit() {
-    if (!partyId) return;
+    // Re-checked rather than trusted from `canSubmit`: the button is only one way
+    // in, and the values are read again here.
+    if (!partyId || filledQty === null || emptyQty === null || filledQty + emptyQty === 0) return;
+
     const { transaction, error: failure } = await submit({
       party_id: partyId,
       date: isoDate(date),
       cylinder_type: cylinderType.trim(),
-      filled_sent: parseInt(filledSent, 10) || 0,
-      empty_received: parseInt(emptyReceived, 10) || 0,
+      filled_sent: filledQty,
+      empty_received: emptyQty,
     });
     if (transaction) {
       notify('Transaction Recorded', `Invoice #${transaction.invoice_no} · DC #${transaction.dc_no}`);
@@ -55,7 +71,12 @@ export default function NewTransactionScreen() {
 
   return (
     <View style={styles.container}>
-      <TopAppBar title="KhaataX" leftIcon="chevron-right" leftIconRotation={180} onLeftPress={() => router.back()} rightIcon="account" />
+      {/*
+        A modal, so the affordance dismisses downward rather than pointing "back" at a
+        screen in a stack — this route is reachable from Home and from the Cylinders
+        menu, and returns to whichever one opened it.
+      */}
+      <TopAppBar title="New Transaction" leftIcon="chevron-down" onLeftPress={() => router.back()} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerBlock}>
           <Text style={styles.h1}>New Transaction</Text>
@@ -135,6 +156,8 @@ export default function NewTransactionScreen() {
                 keyboardType="number-pad"
               />
             </View>
+
+            <ErrorBanner message={quantityError} />
           </View>
 
           <View style={styles.actions}>

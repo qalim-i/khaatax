@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, typography } from '@/constants/design-tokens';
 
@@ -7,14 +7,27 @@ interface StatTileProps {
   value: string | number;
   valueColor?: string;
   bordered?: boolean;
+  /** Supply to make the tile a drill-down; omit and it renders inert as before. */
+  onPress?: () => void;
 }
 
-export function StatTile({ label, value, valueColor = colors.textPrimary, bordered }: StatTileProps) {
+export function StatTile({
+  label,
+  value,
+  valueColor = colors.textPrimary,
+  bordered,
+  onPress,
+}: StatTileProps) {
+  const Container = onPress ? Pressable : View;
+
   return (
-    <View style={[styles.tile, bordered && styles.bordered]}>
+    <Container
+      style={[styles.tile, bordered && styles.bordered]}
+      onPress={onPress}
+      hitSlop={onPress ? 8 : undefined}>
       <Text style={styles.label}>{label}</Text>
       <Text style={[styles.value, { color: valueColor }]}>{value}</Text>
-    </View>
+    </Container>
   );
 }
 
