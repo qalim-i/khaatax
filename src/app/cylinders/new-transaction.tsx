@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { SelectField } from '@/components/ui/select-field';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
@@ -20,7 +21,7 @@ function isoDate(date: Date) {
 }
 
 export default function NewTransactionScreen() {
-  const { parties, loading: partiesLoading, refresh: refreshParties } = useParties();
+  const { parties, loading: partiesLoading, error: partiesError, refresh: refreshParties } = useParties();
   const { submit, submitting } = useCreateTransaction();
 
   // A party added on the Party Ledger screen must be selectable here on return.
@@ -72,6 +73,8 @@ export default function NewTransactionScreen() {
               <Text style={styles.identifierValue}>Assigned on submit</Text>
             </View>
           </View>
+
+          {partiesError ? <ErrorBanner message={partiesError} /> : null}
 
           <SelectField
             label="Party"

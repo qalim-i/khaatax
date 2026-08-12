@@ -23,9 +23,15 @@ export function useCreateParty() {
 
   const create = useCallback(async (input: PartyInput): Promise<string | null> => {
     setSubmitting(true);
-    const { error } = await supabase.from('parties').insert(input);
-    setSubmitting(false);
-    return error ? error.message : null;
+
+    try {
+      const { error } = await supabase.from('parties').insert(input);
+      return error ? error.message : null;
+    } catch (err) {
+      return err instanceof Error ? err.message : 'Could not create party.';
+    } finally {
+      setSubmitting(false);
+    }
   }, []);
 
   return { create, submitting };

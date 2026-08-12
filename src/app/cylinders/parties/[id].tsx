@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ExportDocumentSheet } from '@/components/party/export-document-sheet';
+import { TransactionRow } from '@/components/party/transaction-row';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { TopAppBar } from '@/components/ui/top-app-bar';
-import { TransactionRow } from '@/components/party/transaction-row';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useExportPdf } from '@/hooks/use-export-pdf';
 import { usePartyDetail } from '@/hooks/use-party-detail';
@@ -25,9 +25,12 @@ export default function PartyDetailScreen() {
   useRefreshOnFocus(refresh);
 
   const isSettled = (party?.balance ?? 0) === 0;
-  // Transactions arrive newest-first, so the header button acts on the delivery
-  // just recorded — the common case. Older ones are reachable by tapping a row.
-  const latestTransaction = transactions[0] ?? null;
+  // The export header should always target the most recently created transaction,
+  // even if the list remains ordered by date for history display.
+  const latestTransaction = transactions.reduce<Transaction | null>((latest, tx) => {
+    if (!latest) return tx;
+    return new Date(tx.created_at).getTime() > new Date(latest.created_at).getTime() ? tx : latest;
+  }, null);
 
   function openExport(tx: Transaction) {
     setExportError(null);

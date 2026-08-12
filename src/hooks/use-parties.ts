@@ -15,14 +15,23 @@ export function useParties() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error: fetchError } = await supabase.from('parties').select('*').order('name');
-    if (fetchError) {
-      setError(fetchError.message);
-    } else {
+
+    try {
+      const { data, error: fetchError } = await supabase.from('parties').select('*').order('name');
+      if (fetchError) {
+        setError(fetchError.message);
+        setParties([]);
+        return;
+      }
+
       setError(null);
       setParties((data as Party[]) ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load parties.');
+      setParties([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {

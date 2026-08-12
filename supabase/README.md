@@ -50,12 +50,16 @@ Common causes, in order:
    which is itself subject to RLS on `public.users` — a table GRANT is not enough.
    Without the policy `0006` adds, the hook's role lookup returns NULL and it
    attaches no claim at all, silently. Symptom: `app_role` is *missing* from the
-   JWT rather than wrong. Check with:
+   JWT rather than wrong.
+
+   Check with:
+
    ```sql
    set role supabase_auth_admin;
    select id, role from public.users limit 5;  -- 0 rows means 0006 is missing
    reset role;
    ```
+
 3. The Custom Access Token Hook is not enabled (step 3 above).
 4. The session predates the fix — sign out and back in. This is required after
    *every* change above; tokens are only stamped at issue time.

@@ -23,13 +23,15 @@ function firstParam(value: string | string[] | undefined): string | null {
 
 export default function ExpenseListScreen() {
   const params = useLocalSearchParams<{ category?: string; from?: string; to?: string }>();
-  const { nameFor, users } = useAppUsers();
+  const { nameFor, users, error: userError } = useAppUsers();
   const { expenses, total, filters, setFilter, clearFilters, activeFilterCount, loading, error, refresh } =
     useExpenses({
       category: firstParam(params.category),
       from: firstParam(params.from),
       to: firstParam(params.to),
     });
+
+  const combinedError = [error, userError].filter((message): message is string => Boolean(message)).join('\n');
 
   useRefreshOnFocus(refresh);
 
@@ -130,7 +132,7 @@ export default function ExpenseListScreen() {
               <Text style={styles.totalValue}>{loading ? '—' : formatCurrency(total)}</Text>
             </View>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {combinedError ? <Text style={styles.error}>{combinedError}</Text> : null}
             {loading ? <ActivityIndicator color={colors.primary} /> : null}
           </View>
         }

@@ -29,27 +29,34 @@ export function useCreateExpense() {
     setSubmitting(true);
     setError(null);
 
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData.user?.id;
-    if (!userId) {
-      const message = 'You are signed out. Sign in again to log an expense.';
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) {
+        const message = authError?.message ?? 'You are signed out. Sign in again to log an expense.';
+        setError(message);
+        return { expense: null, error: message };
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('expenses')
+        .insert({ ...input, created_by: userId })
+        .select()
+        .single();
+
+      if (insertError) {
+        setError(insertError.message);
+        return { expense: null, error: insertError.message };
+      }
+
+      return { expense: data as Expense, error: null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not log expense.';
       setError(message);
-      setSubmitting(false);
       return { expense: null, error: message };
+    } finally {
+      setSubmitting(false);
     }
-
-    const { data, error: insertError } = await supabase
-      .from('expenses')
-      .insert({ ...input, created_by: userId })
-      .select()
-      .single();
-
-    setSubmitting(false);
-    if (insertError) {
-      setError(insertError.message);
-      return { expense: null, error: insertError.message };
-    }
-    return { expense: data as Expense, error: null };
   }
 
   return { submit, submitting, error };

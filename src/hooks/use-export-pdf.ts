@@ -46,7 +46,8 @@ export function useExportPdf() {
         const shareUri = renameForSharing(uri, documentFileName(kind, tx));
 
         if (!(await Sharing.isAvailableAsync())) {
-          return 'Sharing is not available on this device. The PDF was saved to app storage.';
+          await Print.printAsync({ html });
+          return null;
         }
 
         await Sharing.shareAsync(shareUri, {

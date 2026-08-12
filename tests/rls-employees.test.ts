@@ -164,28 +164,97 @@ describe('employees RLS', () => {
   });
 
   it('manager INSERT is rejected', async () => {
-    const { error } = await manager
-      .from('employees')
-      .insert({ name: 'RLS probe', role: 'probe', monthly_pay: 1 });
+    const probeName = `__rls_probe_insert_${Date.now()}`;
 
-    expect(error).not.toBeNull();
+    try {
+      const { error } = await manager
+        .from('employees')
+        .insert({ name: probeName, role: 'probe', monthly_pay: 1 });
+
+      expect(error).not.toBeNull();
+    } finally {
+      const { error: cleanupError } = await owner
+        .from('employees')
+        .delete()
+        .eq('name', probeName);
+
+      expect(cleanupError).toBeNull();
+    }
   });
 
   it('manager UPDATE affects no rows', async () => {
-    const { data, error } = await manager
-      .from('employees')
-      .update({ monthly_pay: 1 })
-      .neq('name', '')
-      .select();
+    const probeName = `__rls_probe_update_${Date.now()}`;
+    let probeId: string | undefined;
 
-    // Either the policy rejects it outright or it matches nothing. Both are fine;
-    // silently updating a row is not.
-    if (error === null) expect(data).toEqual([]);
+    try {
+      const { data: inserted, error: insertError } = await owner
+        .from('employees')
+        .insert({ name: probeName, role: 'probe', monthly_pay: 0 })
+        .select()
+        .single();
+
+      expect(insertError).toBeNull();
+      probeId = (inserted as { id: string } | null)?.id;
+      expect(probeId).toBeTruthy();
+
+      const { data, error } = await manager
+        .from('employees')
+        .update({ monthly_pay: 1 })
+        .eq('id', probeId!)
+        .select();
+
+      // Either the policy rejects it outright or it matches nothing. Both are fine;
+      // silently updating a row is not.
+      if (error === null) expect(data).toEqual([]);
+
+      const { data: readBack, error: readError } = await owner
+        .from('employees')
+        .select('monthly_pay')
+        .eq('id', probeId!)
+        .single();
+
+      expect(readError).toBeNull();
+      expect((readBack as { monthly_pay: number } | null)?.monthly_pay).toBe(0);
+    } finally {
+      if (probeId) {
+        const { error: cleanupError } = await owner.from('employees').delete().eq('id', probeId);
+        expect(cleanupError).toBeNull();
+      }
+    }
   });
 
   it('manager DELETE affects no rows', async () => {
-    const { data, error } = await manager.from('employees').delete().neq('name', '').select();
+    const probeName = `__rls_probe_delete_${Date.now()}`;
+    let probeId: string | undefined;
 
-    if (error === null) expect(data).toEqual([]);
+    try {
+      const { data: inserted, error: insertError } = await owner
+        .from('employees')
+        .insert({ name: probeName, role: 'probe', monthly_pay: 5 })
+        .select()
+        .single();
+
+      expect(insertError).toBeNull();
+      probeId = (inserted as { id: string } | null)?.id;
+      expect(probeId).toBeTruthy();
+
+      const { data, error } = await manager.from('employees').delete().eq('id', probeId!).select();
+
+      if (error === null) expect(data).toEqual([]);
+
+      const { data: row, error: readError } = await owner
+        .from('employees')
+        .select('name, monthly_pay')
+        .eq('id', probeId!)
+        .single();
+
+      expect(readError).toBeNull();
+      expect(row).toMatchObject({ name: probeName, monthly_pay: 5 });
+    } finally {
+      if (probeId) {
+        const { error: cleanupError } = await owner.from('employees').delete().eq('id', probeId);
+        expect(cleanupError).toBeNull();
+      }
+    }
   });
 });
