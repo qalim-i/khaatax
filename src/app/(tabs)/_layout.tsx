@@ -6,9 +6,13 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { colors } from '@/constants/design-tokens';
 
 function TabIcon(name: IconName) {
-  return ({ color, size }: { focused: boolean; color: ColorValue; size: number }) => (
-    <Icon name={name} width={size} height={size} color={color as string} />
-  );
+  // Named rather than returned anonymously so React DevTools and any error
+  // boundary report "TabIcon(cylinders)" instead of a bare "Anonymous".
+  function TabBarIcon({ color, size }: { focused: boolean; color: ColorValue; size: number }) {
+    return <Icon name={name} width={size} height={size} color={color as string} />;
+  }
+  TabBarIcon.displayName = `TabIcon(${name})`;
+  return TabBarIcon;
 }
 
 /*

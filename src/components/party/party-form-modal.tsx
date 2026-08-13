@@ -22,6 +22,11 @@ export function PartyFormModal({ visible, onClose, onSubmit }: PartyFormModalPro
   // whatever the last attempt left behind.
   useEffect(() => {
     if (!visible) return;
+    // Resetting on open, rather than keying the component from the parent, is a
+    // deliberate trade: a `key` change would remount the sheet on close too and
+    // cut the slide-out animation short. The effect is scoped to the open
+    // transition and touches only this component's own fields.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setName('');
     setContact('');
     setDeposit('');

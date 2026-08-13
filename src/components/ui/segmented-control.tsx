@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing, typography } from '@/constants/design-tokens';
+import { colors, radius, typography } from '@/constants/design-tokens';
 
 export interface Segment<T extends string> {
   value: T;

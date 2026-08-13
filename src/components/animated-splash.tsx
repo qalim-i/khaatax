@@ -1,5 +1,5 @@
 import * as SplashScreen from 'expo-splash-screen';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Animated, Dimensions, Easing, StyleSheet, View } from 'react-native';
 
 /**
@@ -34,10 +34,17 @@ const BAR_FILL = '#2ECC71';
 export function AnimatedSplashOverlay() {
   const [visible, setVisible] = useState(true);
 
-  const logoScale = useRef(new Animated.Value(0.7)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const barProgress = useRef(new Animated.Value(0)).current;
-  const screenOpacity = useRef(new Animated.Value(1)).current;
+  /*
+    `useState` with a lazy initialiser rather than `useRef(new Animated.Value(x))`.
+    Two reasons, and only the second is about lint: the ref form constructs a
+    fresh Animated.Value on every render and throws it away (useRef ignores its
+    argument after the first call), and reading `.current` during render is what
+    react-hooks/refs flags. The initialiser runs exactly once.
+  */
+  const [logoScale] = useState(() => new Animated.Value(0.7));
+  const [logoOpacity] = useState(() => new Animated.Value(0));
+  const [barProgress] = useState(() => new Animated.Value(0));
+  const [screenOpacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     const sequence = Animated.sequence([
