@@ -8,20 +8,13 @@ import { SelectField } from '@/components/ui/select-field';
 import { TopAppBar } from '@/components/ui/top-app-bar';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import { useCreateTransaction } from '@/hooks/use-create-transaction';
+import { toIsoDate } from '@/lib/date';
 import { notify } from '@/lib/dialog';
-import { formatCurrencyExact } from '@/lib/format';
+import { formatCurrencyExact, formatDisplayDate } from '@/lib/format';
 import { parseAmount } from '@/lib/money';
 import { parseQuantity } from '@/lib/quantity';
 import { useParties } from '@/hooks/use-parties';
 import { useRefreshOnFocus } from '@/hooks/use-refresh-on-focus';
-
-function formatDate(date: Date) {
-  return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-}
-
-function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
 
 export default function NewTransactionScreen() {
   const { parties, loading: partiesLoading, error: partiesError, refresh: refreshParties } = useParties();
@@ -68,7 +61,7 @@ export default function NewTransactionScreen() {
 
     const { transaction, error: failure } = await submit({
       party_id: partyId,
-      date: isoDate(date),
+      date: toIsoDate(date),
       cylinder_type: cylinderType.trim(),
       filled_sent: filledQty,
       empty_received: emptyQty,
@@ -124,7 +117,7 @@ export default function NewTransactionScreen() {
           <View style={styles.field}>
             <Text style={styles.label}>Date</Text>
             <Pressable style={styles.dateControl} onPress={() => setShowDatePicker(true)}>
-              <Text style={styles.dateText}>{formatDate(date)}</Text>
+              <Text style={styles.dateText}>{formatDisplayDate(toIsoDate(date))}</Text>
             </Pressable>
             {showDatePicker ? (
               <DateTimePicker
