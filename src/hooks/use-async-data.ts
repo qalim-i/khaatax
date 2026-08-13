@@ -110,10 +110,21 @@ export function useAsyncData<T>(
 }
 
 /**
+ * One shared empty array, so the null case is reference-stable.
+ *
+ * `data ?? []` allocates a fresh array on every render while the first load is
+ * in flight, and hooks feed this straight into `useMemo` deps — so every
+ * dependent recomputes each pass for the whole loading window. Returning one
+ * instance makes those memos hold. Frozen because a caller mutating it would
+ * corrupt every other hook's empty state.
+ */
+const EMPTY: readonly never[] = Object.freeze([]);
+
+/**
  * `data` is null until the first load resolves. Read hooks that front a list
  * want an empty array in that window rather than a null check at every call
  * site.
  */
 export function orEmpty<T>(data: T[] | null): T[] {
-  return data ?? [];
+  return data ?? (EMPTY as unknown as T[]);
 }
