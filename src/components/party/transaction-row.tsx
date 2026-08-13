@@ -2,11 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
 import type { TransactionWithRunningBalance } from '@/hooks/use-party-detail';
-import { formatCurrencyExact } from '@/lib/format';
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { formatCurrencyExact, formatDisplayDate } from '@/lib/format';
 
 interface TransactionRowProps {
   tx: TransactionWithRunningBalance;
@@ -21,7 +17,7 @@ export function TransactionRow({ tx, onPress }: TransactionRowProps) {
       onPress={onPress}
       disabled={!onPress}>
       <View style={styles.topLine}>
-        <Text style={styles.date}>{formatDate(tx.date)}</Text>
+        <Text style={styles.date}>{formatDisplayDate(tx.date)}</Text>
         <Text style={styles.numbers}>
           INV-{tx.invoice_no} · DC-{tx.dc_no}
         </Text>

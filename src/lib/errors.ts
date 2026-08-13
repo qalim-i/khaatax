@@ -53,7 +53,20 @@ const RPC_USER_MESSAGE_CODE = 'KX001';
 
 const SESSION_CODES = new Set(['PGRST301', '401']);
 
-function looksLikeSessionFailure(error: SupabaseLikeError): boolean {
+/**
+ * True when a failure means "your token isn't valid", as opposed to a policy
+ * denial or a missing row.
+ *
+ * Exported because `AuthProvider` acts on this, not just reports it: a true
+ * here drops the user to the sign-in screen. That makes the negative case
+ * load-bearing — RLS denials come back as empty result sets or `42501`, never
+ * as 401/PGRST301, and this must not fire on them, or a manager touching a
+ * table they cannot read would be signed out.
+ *
+ * The word boundaries are deliberate: an unanchored /token/ matches
+ * "tokenizer", which is not a session problem.
+ */
+export function looksLikeSessionFailure(error: SupabaseLikeError): boolean {
   return (
     SESSION_CODES.has(error.code ?? '') ||
     /\bjwt\b|\btoken\b/i.test(error.message ?? '')
