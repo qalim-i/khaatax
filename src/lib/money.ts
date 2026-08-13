@@ -26,8 +26,10 @@ export function parseAmount(raw: string): number | null {
   const value = Number(trimmed);
   if (!Number.isFinite(value)) return null;
 
-  // Guard the numeric(12,2) column: anything past ten crore is a typo, not a
-  // delivery, and would come back as a constraint violation the user cannot act on.
+  // Guard the numeric(12,2) column, whose ceiling is 9,999,999,999.99 — ten
+  // digits before the point. Anything approaching that is a typo, not a
+  // delivery, and would come back as a constraint violation the user cannot act
+  // on. (This said "ten crore" for a while; the figure is a thousand crore.)
   if (value > 9_999_999_999) return null;
 
   return Math.round(value * 100) / 100;

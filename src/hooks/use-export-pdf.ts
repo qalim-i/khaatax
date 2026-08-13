@@ -4,6 +4,8 @@ import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { logError, toUserMessage } from '@/lib/errors';
+
 import {
   buildDocumentHtml,
   documentFileName,
@@ -57,7 +59,12 @@ export function useExportPdf() {
         });
         return null;
       } catch (err) {
-        return err instanceof Error ? err.message : 'Could not generate the PDF.';
+        // Was `err.message` raw. Nothing else in the app puts an unsanitised
+        // message on screen, and `toUserMessage` also handles a thrown
+        // non-Error, which the `instanceof` check silently collapsed to the
+        // generic string.
+        logError('useExportPdf', err);
+        return toUserMessage(err, 'Could not generate the PDF.');
       } finally {
         setExporting(false);
       }

@@ -20,7 +20,7 @@
 
 -- 1. The column ---------------------------------------------------------------
 --
--- numeric(12,2): money, two decimal places, up to ten crore. Same family as
+-- numeric(12,2): money, two decimal places, ceiling 9,999,999,999.99. Same family as
 -- expenses.amount, but scaled — expenses.amount is bare `numeric` and inherits
 -- whatever scale the client sends.
 --

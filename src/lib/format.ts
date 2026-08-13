@@ -19,12 +19,24 @@ export function formatCurrencyExact(amount: number): string {
   })}`;
 }
 
-/** Compact form for chart axes, where full figures don't fit. */
+/**
+ * Compact form for chart axes, where full figures don't fit.
+ *
+ * The thresholds are compared on the magnitude, so a negative figure abbreviates
+ * the same way its positive twin does. Comparing the signed value meant every
+ * negative fell through to the last branch — -250000 rendered as "₹-250000",
+ * the exact overflow the compact form exists to prevent. Nothing plots a
+ * negative today, but `amount_due` is signed by design (a credit balance), so
+ * the first chart that touches it would have hit this.
+ */
 export function formatCurrencyCompact(amount: number): string {
-  if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(1)}Cr`;
-  if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(1)}L`;
-  if (amount >= 1_000) return `₹${(amount / 1_000).toFixed(1)}K`;
-  return `₹${Math.round(amount)}`;
+  const sign = amount < 0 ? '-' : '';
+  const value = Math.abs(amount);
+
+  if (value >= 10_000_000) return `₹${sign}${(value / 10_000_000).toFixed(1)}Cr`;
+  if (value >= 100_000) return `₹${sign}${(value / 100_000).toFixed(1)}L`;
+  if (value >= 1_000) return `₹${sign}${(value / 1_000).toFixed(1)}K`;
+  return `₹${sign}${Math.round(value)}`;
 }
 
 /** "11 Aug 2026" — used on expense rows and report lines. */
