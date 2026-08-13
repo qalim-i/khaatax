@@ -166,6 +166,23 @@ the Invoice and the Delivery Challan. No PRD story called for it; it was request
 - Ledger totals report money owed and money held as credit as **two separate figures**; they
   are never netted. See the comment in `src/lib/receivables.ts` for why.
 
+**First-run walkthrough (post-Phase 4):** an eight-slide welcome carousel shown once per user
+after the first sign-in. Requested directly; no PRD story covers it, and the docs describe no
+onboarding of any kind (GEN-2 is just "log in with provisioned credentials").
+
+- Presentation only — **no migration, no new dependency, no schema or grant change.** The
+  "seen" flag is an AsyncStorage key, `khaatax.onboarding.v1.<userId>`, on the dependency the
+  Supabase session already uses. Per-user so a shared handset still shows it to each account;
+  the `v1` segment lets a rewritten tour replay for everyone.
+- Slide content and the role filter live in `src/lib/onboarding.ts` — pure, so `onboarding.test.ts`
+  covers them. `use-onboarding.tsx` is the only file that touches storage.
+- The Payroll slide is owner-only. That is presentation matching what RLS already enforces,
+  **not** a second access control; Non-Negotiable Rule 1 is untouched and `test:rls` is unaffected.
+- Two slides exist for the concepts, not the screens: a party's cylinder count and rupee figure
+  are separate numbers, and a party "in credit" has paid ahead. Both are the misreadings
+  `src/lib/receivables.ts` was written to prevent.
+- Replayable from Profile. Replaying does not clear the stored flag.
+
 **Still outstanding:**
 - The owner web view (PRD GEN-3) was deliberately deferred — not built. This is the last unbuilt "Should" in the PRD.
 - PDF export covers Invoice and Delivery Challan only (PRD INV-5). Stock-summary and report exports were considered in Phase 4 and left out — no PRD story calls for them. The Export button on the Stock screen says so rather than promising one.
