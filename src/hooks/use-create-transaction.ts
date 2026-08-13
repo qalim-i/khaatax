@@ -38,7 +38,7 @@ export function useCreateTransaction() {
       setError(message);
       return { transaction: null, error: message };
     }
-    return { transaction: data as Transaction, error: null };
+    return { transaction: data, error: null };
   }
 
   return { submit, submitting, error };

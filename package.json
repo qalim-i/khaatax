@@ -53,7 +53,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest --selectProjects unit",
-    "test:rls": "jest --selectProjects rls --runInBand"
+    "test:rls": "jest --selectProjects rls --runInBand",
+    "gen:types": "supabase gen types typescript --project-id jgnmyxmxzmwpxplzuyxu --schema public > src/types/supabase-generated.ts"
   },
   "jest": {
     "projects": [

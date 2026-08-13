@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import { startOfMonthIso } from '@/lib/date';
-import { logError, toUserMessage } from '@/lib/errors';
 import { summariseReceivables } from '@/lib/receivables';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
@@ -13,48 +13,38 @@ export interface PartyLedgerRow {
 }
 
 export function usePartyLedger() {
-  const [rows, setRows] = useState<PartyLedgerRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data, loading, initialLoading, error, refresh } = useAsyncData<PartyLedgerRow[]>(
+    async () => {
       const [partiesRes, txRes] = await Promise.all([
         supabase.from('parties').select('*').order('name'),
-        supabase.from('transactions').select('party_id, filled_sent, empty_received').gte('date', startOfMonthIso()),
+        supabase
+          .from('transactions')
+          .select('party_id, filled_sent, empty_received')
+          .gte('date', startOfMonthIso()),
       ]);
       if (partiesRes.error) throw partiesRes.error;
       if (txRes.error) throw txRes.error;
 
       const mtdByParty = new Map<string, { filled: number; empty: number }>();
-      for (const tx of txRes.data as { party_id: string; filled_sent: number; empty_received: number }[]) {
+      for (const tx of txRes.data) {
         const entry = mtdByParty.get(tx.party_id) ?? { filled: 0, empty: 0 };
         entry.filled += tx.filled_sent;
         entry.empty += tx.empty_received;
         mtdByParty.set(tx.party_id, entry);
       }
 
-      const combined: PartyLedgerRow[] = (partiesRes.data as Party[]).map((party) => ({
+      return partiesRes.data.map((party) => ({
         party,
         filledSentMtd: mtdByParty.get(party.id)?.filled ?? 0,
         emptyReceivedMtd: mtdByParty.get(party.id)?.empty ?? 0,
       }));
+    },
+    { fallbackMessage: 'Could not load the party ledger.', context: 'usePartyLedger' }
+  );
 
-      setRows(combined);
-      setError(null);
-    } catch (err) {
-      logError('usePartyLedger', err);
-      setError(toUserMessage(err, 'Could not load the party ledger.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const rows = orEmpty(data);
 
   const filteredRows = useMemo(() => {
     if (!query.trim()) return rows;
@@ -80,5 +70,5 @@ export function usePartyLedger() {
     return { ...counts, ...summariseReceivables(rows.map((r) => r.party)) };
   }, [rows]);
 
-  return { rows: filteredRows, totals, loading, error, query, setQuery, refresh: load };
+  return { rows: filteredRows, totals, loading, initialLoading, error, query, setQuery, refresh };
 }

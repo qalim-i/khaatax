@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import type { CreateExpenseInput, Expense } from '@/types/db';
+import type { CreateExpenseInput, Expense, ExpenseCategory } from '@/types/db';
 
 /**
  * Logs an expense directly — there is no approval step by design (PRD EXP-1), so
@@ -50,7 +50,7 @@ export function useCreateExpense() {
         return { expense: null, error: message };
       }
 
-      return { expense: data as Expense, error: null };
+      return { expense: { ...data, category: data.category as ExpenseCategory }, error: null };
     } catch (err) {
       logError('useCreateExpense', err);
       const message = toUserMessage(err, 'Could not log the expense.');

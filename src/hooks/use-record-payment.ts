@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import type { Payment, RecordPaymentInput } from '@/types/db';
+import type { Payment, PaymentMethod, RecordPaymentInput } from '@/types/db';
 
 export interface RecordPaymentOutcome {
   payment: Payment | null;
@@ -37,7 +37,12 @@ export function useRecordPayment() {
       p_date: input.date,
       p_amount: input.amount,
       p_method: input.method,
-      p_note: input.note,
+      // The generated Args type models every function parameter as non-null:
+      // PostgREST's schema output carries no nullability for arguments. `p_note
+      // text` does take SQL NULL — record_payment normalises it with
+      // `nullif(btrim(p_note), '')` — and an absent note is genuinely null, so
+      // this asserts over a generator limitation, not over a real constraint.
+      p_note: input.note as string,
     });
 
     setSubmitting(false);
@@ -49,7 +54,7 @@ export function useRecordPayment() {
       return { payment: null, error: message };
     }
 
-    return { payment: data as Payment, error: null };
+    return { payment: { ...data, method: data.method as PaymentMethod }, error: null };
   }
 
   return { submit, submitting, error };

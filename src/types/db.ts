@@ -1,33 +1,53 @@
-// Mirrors the schema in docs/TRD.md Section 3. Treat the TRD as source of truth.
+// Domain types for the app.
+//
+// Column PRESENCE and base types are derived from `supabase-generated.ts`, which
+// is introspected from the live database (`npm run gen:types`). Hand-writing them
+// against docs/TRD.md meant a renamed or dropped column stayed green until it
+// failed at runtime — the whole shape was asserted with `as Party[]` at every
+// call site and never actually checked. Deriving makes that a compile error.
+//
+// Two things are still declared by hand on top of the generated rows:
+//
+//   * The string unions. Postgres holds `role`, `status`, `method` and `category`
+//     as `text` with CHECK constraints, so the generator can only see `string`.
+//     The unions are narrower than the schema on purpose and are the reason this
+//     file is not a bare re-export.
+//   * The field comments. `balance` vs `amount_due` is the distinction this app
+//     most needs to keep straight (CLAUDE.md), and a generated file cannot carry
+//     that.
+//
+// Treat the TRD as source of truth for intent; treat the generated file as source
+// of truth for what the database actually has.
+
+import type { Database } from './supabase-generated';
+
+type Tables = Database['public']['Tables'];
+
+/** Replace named fields of a generated row with narrower hand-written ones. */
+type Narrow<Row, Fields extends Partial<Record<keyof Row, unknown>>> = Omit<Row, keyof Fields> &
+  Fields;
 
 export type UserRole = 'owner' | 'manager';
 
 export type StockStatus = 'filled' | 'empty' | 'at_customer' | 'under_refill' | 'damaged';
 
-export interface AppUser {
-  id: string;
-  name: string;
-  role: UserRole;
-  created_at: string;
-}
+export type AppUser = Narrow<Tables['users']['Row'], { role: UserRole }>;
 
-export interface Party {
-  id: string;
-  name: string;
-  contact: string | null;
-  security_deposit: number;
-  /** Cylinders held by the party. A COUNT, not money. */
-  balance: number;
-  /**
-   * Rupees the party owes: charges less payments (migration 0010).
-   *
-   * Negative means the party is in credit — an advance or an overpayment, both
-   * ordinary here. Not interchangeable with `balance`; never render one where
-   * the other belongs.
-   */
-  amount_due: number;
-  created_at: string;
-}
+export type Party = Narrow<
+  Tables['parties']['Row'],
+  {
+    /** Cylinders held by the party. A COUNT, not money. */
+    balance: number;
+    /**
+     * Rupees the party owes: charges less payments (migration 0010).
+     *
+     * Negative means the party is in credit — an advance or an overpayment, both
+     * ordinary here. Not interchangeable with `balance`; never render one where
+     * the other belongs.
+     */
+    amount_due: number;
+  }
+>;
 
 // Input for creating a party. `balance` is deliberately absent — it is a derived
 // value moved only by the create_transaction RPC, never set from the client.
@@ -37,26 +57,19 @@ export interface PartyInput {
   security_deposit: number;
 }
 
-export interface Transaction {
-  id: string;
-  party_id: string;
-  date: string;
-  invoice_no: number;
-  dc_no: number;
-  cylinder_type: string;
-  filled_sent: number;
-  empty_received: number;
-  /**
-   * Rupees charged to the party for this transaction, entered by hand on New
-   * Transaction and printed on both documents.
-   *
-   * Recorded, not accounted: this does NOT feed `parties.balance`, which is a
-   * cylinder count. Rows written before migration 0009 carry 0.
-   */
-  amount: number;
-  created_by: string;
-  created_at: string;
-}
+export type Transaction = Narrow<
+  Tables['transactions']['Row'],
+  {
+    /**
+     * Rupees charged to the party for this transaction, entered by hand on New
+     * Transaction and printed on both documents.
+     *
+     * Recorded, not accounted: this does NOT feed `parties.balance`, which is a
+     * cylinder count. Rows written before migration 0009 carry 0.
+     */
+    amount: number;
+  }
+>;
 
 export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'cheque' | 'other';
 
@@ -68,16 +81,7 @@ export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'cheque' | 'other';
  * `delete_payment`, which puts the money back on `parties.amount_due`, and
  * re-recorded.
  */
-export interface Payment {
-  id: string;
-  party_id: string;
-  date: string;
-  amount: number;
-  method: PaymentMethod;
-  note: string | null;
-  created_by: string;
-  created_at: string;
-}
+export type Payment = Narrow<Tables['payments']['Row'], { method: PaymentMethod }>;
 
 // Input for the record_payment RPC. `created_by` is stamped by the server.
 export interface RecordPaymentInput {
@@ -88,11 +92,7 @@ export interface RecordPaymentInput {
   note: string | null;
 }
 
-export interface Stock {
-  status: StockStatus;
-  quantity: number;
-  updated_at: string;
-}
+export type Stock = Narrow<Tables['stock']['Row'], { status: StockStatus }>;
 
 export type ExpenseCategory =
   | 'Rent'
@@ -108,24 +108,9 @@ export type ExpenseCategory =
   | 'Utilities'
   | 'Misc';
 
-export interface Expense {
-  id: string;
-  date: string;
-  amount: number;
-  category: ExpenseCategory;
-  note: string | null;
-  created_by: string;
-  created_at: string;
-}
+export type Expense = Narrow<Tables['expenses']['Row'], { category: ExpenseCategory }>;
 
-export interface Employee {
-  id: string;
-  name: string;
-  role: string | null;
-  monthly_pay: number;
-  active: boolean;
-  created_at: string;
-}
+export type Employee = Tables['employees']['Row'];
 
 // Input for the New Transaction server-side RPC (TRD Section 6.1).
 // invoice_no / dc_no are never supplied by the client — the RPC assigns them.

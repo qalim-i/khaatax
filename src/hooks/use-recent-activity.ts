@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-
-import { logError, toUserMessage } from '@/lib/errors';
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import { supabase } from '@/lib/supabase';
 
 export interface ActivityItem {
@@ -8,10 +6,19 @@ export interface ActivityItem {
   kind: 'dispatch' | 'return' | 'expense';
   title: string;
   subtitle: string;
-  timestamp: string;
+  /**
+   * `created_at` is nullable in the schema (`timestamptz default now()` with no
+   * NOT NULL). Rows written through the app always carry one, but the feed is
+   * ordered and labelled by this value, so the absent case is modelled rather
+   * than assumed — it used to be hidden behind an `any` on the row mapper.
+   */
+  timestamp: string | null;
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string | null): string {
+  // `new Date(null)` is the epoch, which would render as "20000d ago" rather
+  // than admitting the timestamp is missing.
+  if (!iso) return 'unknown';
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
   if (minutes < 1) return 'just now';
@@ -21,17 +28,11 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+const millis = (iso: string | null) => (iso ? new Date(iso).getTime() : 0);
+
 export function useRecentActivity(limit = 5) {
-  const [items, setItems] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestIdRef = useRef(0);
-
-  const load = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-
-    try {
+  const { data, loading, error, refresh } = useAsyncData<ActivityItem[]>(
+    async () => {
       const [txRes, expRes] = await Promise.all([
         supabase
           .from('transactions')
@@ -45,15 +46,12 @@ export function useRecentActivity(limit = 5) {
           .limit(limit),
       ]);
 
-      if (requestId !== requestIdRef.current) return;
-
       // A denied read comes back as an error with no rows. Without this the feed
       // renders empty and indistinguishable from "nothing has happened yet".
-      const failure = txRes.error ?? expRes.error;
-      if (failure) logError('useRecentActivity', failure);
-      setError(failure ? toUserMessage(failure, 'Could not load recent activity.') : null);
+      if (txRes.error) throw txRes.error;
+      if (expRes.error) throw expRes.error;
 
-      const txItems: ActivityItem[] = (txRes.data ?? []).map((t: any) => ({
+      const txItems: ActivityItem[] = txRes.data.map((t) => ({
         id: `tx-${t.id}`,
         kind: t.filled_sent > 0 ? 'dispatch' : 'return',
         title: t.filled_sent > 0 ? 'Cylinders Dispatched' : 'Empties Received',
@@ -64,7 +62,7 @@ export function useRecentActivity(limit = 5) {
         timestamp: t.created_at,
       }));
 
-      const expItems: ActivityItem[] = (expRes.data ?? []).map((e: any) => ({
+      const expItems: ActivityItem[] = expRes.data.map((e) => ({
         id: `exp-${e.id}`,
         kind: 'expense',
         title: 'Expense Logged',
@@ -72,30 +70,17 @@ export function useRecentActivity(limit = 5) {
         timestamp: e.created_at,
       }));
 
-      const merged = [...txItems, ...expItems]
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      return [...txItems, ...expItems]
+        // Undated rows sort last rather than to the epoch-adjacent middle.
+        .sort((a, b) => millis(b.timestamp) - millis(a.timestamp))
         .slice(0, limit);
-
-      setItems(merged);
-    } catch (err) {
-      if (requestId === requestIdRef.current) {
-        logError('useRecentActivity', err);
-        setError(toUserMessage(err, 'Could not load recent activity.'));
-        setItems([]);
-      }
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
+    },
+    {
+      fallbackMessage: 'Could not load recent activity.',
+      context: 'useRecentActivity',
+      deps: [limit],
     }
-  }, [limit]);
+  );
 
-  useEffect(() => {
-    load();
-    return () => {
-      requestIdRef.current += 1;
-    };
-  }, [load]);
-
-  return { items, loading, error, timeAgo, refresh: load };
+  return { items: orEmpty(data), loading, error, timeAgo, refresh };
 }

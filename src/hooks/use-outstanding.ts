@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
+import { useAsyncData } from '@/hooks/use-async-data';
 import { computeOutstanding, type OutstandingTransactionInput } from '@/lib/outstanding';
-import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import type { Party } from '@/types/db';
 
@@ -43,17 +43,14 @@ export interface OutstandingReportRow {
  */
 export function useOutstanding() {
   const [filters, setFilters] = useState<OutstandingFilters>(EMPTY_OUTSTANDING_FILTERS);
-  const [parties, setParties] = useState<Party[]>([]);
-  const [transactions, setTransactions] = useState<OutstandingTransactionInput[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const { from, to } = filters;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const { data, loading, initialLoading, error, refresh } = useAsyncData<{
+    parties: Party[];
+    transactions: OutstandingTransactionInput[];
+  }>(
+    async () => {
       let txQuery = supabase
         .from('transactions')
         .select('party_id, date, cylinder_type, filled_sent, empty_received')
@@ -70,19 +67,20 @@ export function useOutstanding() {
       if (partiesRes.error) throw partiesRes.error;
       if (txRes.error) throw txRes.error;
 
-      setParties((partiesRes.data as Party[]) ?? []);
-      setTransactions((txRes.data as OutstandingTransactionInput[]) ?? []);
-    } catch (err) {
-      logError('useOutstanding', err);
-      setError(toUserMessage(err, 'Could not load the outstanding report.'));
-    } finally {
-      setLoading(false);
+      return { parties: partiesRes.data, transactions: txRes.data };
+    },
+    {
+      fallbackMessage: 'Could not load the outstanding report.',
+      context: 'useOutstanding',
+      deps: [from, to],
     }
-  }, [from, to]);
+  );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Memoised, not inlined: `data?.parties ?? []` builds a fresh array on every
+  // render while the first load is still in flight, which would invalidate every
+  // useMemo below it and recompute the whole report each pass.
+  const parties = useMemo(() => data?.parties ?? [], [data]);
+  const transactions = useMemo(() => data?.transactions ?? [], [data]);
 
   const allRows = useMemo<OutstandingReportRow[]>(() => {
     const partyNames = new Map(parties.map((party) => [party.id, party.name]));
@@ -143,7 +141,8 @@ export function useOutstanding() {
     clearFilters,
     activeFilterCount,
     loading,
+    initialLoading,
     error,
-    refresh: load,
+    refresh,
   };
 }

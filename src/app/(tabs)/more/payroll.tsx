@@ -62,7 +62,7 @@ function PayrollContent() {
   const {
     employees,
     summary,
-    loading,
+    initialLoading,
     error,
     showInactive,
     setShowInactive,
@@ -124,24 +124,24 @@ function PayrollContent() {
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>TOTAL MONTHLY PAYROLL</Text>
               <Text style={styles.summaryValue}>
-                {loading ? '—' : formatCurrency(summary.monthlyTotal)}
+                {initialLoading ? '—' : formatCurrency(summary.monthlyTotal)}
               </Text>
 
               <View style={styles.summaryStatsRow}>
                 <View style={styles.summaryStat}>
                   <Text style={styles.statLabel}>EMPLOYEES</Text>
-                  <Text style={styles.statValue}>{loading ? '—' : summary.activeCount}</Text>
+                  <Text style={styles.statValue}>{initialLoading ? '—' : summary.activeCount}</Text>
                 </View>
                 <View style={[styles.summaryStat, styles.summaryStatBordered]}>
                   <Text style={styles.statLabel}>AVERAGE</Text>
                   <Text style={styles.statValue}>
-                    {loading ? '—' : formatCurrency(Math.round(summary.averagePay))}
+                    {initialLoading ? '—' : formatCurrency(Math.round(summary.averagePay))}
                   </Text>
                 </View>
                 <View style={[styles.summaryStat, styles.summaryStatBordered]}>
                   <Text style={styles.statLabel}>ANNUAL</Text>
                   <Text style={styles.statValue}>
-                    {loading ? '—' : formatCurrency(summary.annualTotal)}
+                    {initialLoading ? '—' : formatCurrency(summary.annualTotal)}
                   </Text>
                 </View>
               </View>
@@ -178,7 +178,7 @@ function PayrollContent() {
               ) : null}
             </View>
 
-            {loading ? <ActivityIndicator color={colors.primary} /> : null}
+            {initialLoading ? <ActivityIndicator color={colors.primary} /> : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -190,7 +190,7 @@ function PayrollContent() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
-          !loading ? (
+          !initialLoading ? (
             <Text style={styles.emptyState}>No employees on payroll yet. Add the first one above.</Text>
           ) : null
         }

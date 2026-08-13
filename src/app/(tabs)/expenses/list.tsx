@@ -24,7 +24,7 @@ function firstParam(value: string | string[] | undefined): string | null {
 export default function ExpenseListScreen() {
   const params = useLocalSearchParams<{ category?: string; from?: string; to?: string }>();
   const { nameFor, users, error: userError } = useAppUsers();
-  const { expenses, total, filters, setFilter, clearFilters, activeFilterCount, loading, error, refresh } =
+  const { expenses, total, filters, setFilter, clearFilters, activeFilterCount, initialLoading, error, refresh } =
     useExpenses({
       category: firstParam(params.category),
       from: firstParam(params.from),
@@ -130,17 +130,19 @@ export default function ExpenseListScreen() {
               <Text style={styles.totalLabel}>
                 {expenses.length} {expenses.length === 1 ? 'ENTRY' : 'ENTRIES'}
               </Text>
-              <Text style={styles.totalValue}>{loading ? '—' : formatCurrency(total)}</Text>
+              <Text style={styles.totalValue}>{initialLoading ? '—' : formatCurrency(total)}</Text>
             </View>
 
             {combinedError ? <Text style={styles.error}>{combinedError}</Text> : null}
-            {loading ? <ActivityIndicator color={colors.primary} /> : null}
+            {initialLoading ? <ActivityIndicator color={colors.primary} /> : null}
           </View>
         }
         renderItem={({ item }) => <ExpenseRow expense={item} loggedBy={nameFor(item.created_by)} />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
-          !loading ? <Text style={styles.emptyState}>No expenses match these filters.</Text> : null
+          !initialLoading ? (
+            <Text style={styles.emptyState}>No expenses match these filters.</Text>
+          ) : null
         }
       />
     </View>

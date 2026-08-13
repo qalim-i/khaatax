@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { colors, radius, spacing, typography } from '@/constants/design-tokens';
+import { parseQuantity } from '@/lib/quantity';
 import type { StockStatus } from '@/types/db';
 
 const STATUS_OPTIONS: { value: StockStatus; label: string }[] = [
@@ -16,7 +18,8 @@ const STATUS_OPTIONS: { value: StockStatus; label: string }[] = [
 interface AdjustStockModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (status: StockStatus, delta: number) => Promise<boolean>;
+  /** Returns a failure message, or null on success. */
+  onSubmit: (status: StockStatus, delta: number) => Promise<string | null>;
 }
 
 export function AdjustStockModal({ visible, onClose, onSubmit }: AdjustStockModalProps) {
@@ -24,17 +27,32 @@ export function AdjustStockModal({ visible, onClose, onSubmit }: AdjustStockModa
   const [direction, setDirection] = useState<'add' | 'remove'>('add');
   const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // The failure used to land in useStock's error state, which renders on the
+  // Stock screen *behind* this modal — so a rejected adjustment looked like a
+  // button that did nothing. The message belongs where the user is.
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
-    const qty = parseInt(amount, 10);
-    if (!qty || qty <= 0) return;
-    setSubmitting(true);
-    const ok = await onSubmit(status, direction === 'add' ? qty : -qty);
-    setSubmitting(false);
-    if (ok) {
-      setAmount('');
-      onClose();
+    // `parseInt` here accepted "12abc" as 12 and leaned on `!qty` to catch the
+    // rest; `parseQuantity` is the same guard the transaction form uses.
+    const qty = parseQuantity(amount);
+    if (qty === null || qty <= 0) {
+      setError('Quantity must be a whole number greater than zero.');
+      return;
     }
+
+    setSubmitting(true);
+    const failure = await onSubmit(status, direction === 'add' ? qty : -qty);
+    setSubmitting(false);
+
+    if (failure) {
+      setError(failure);
+      return;
+    }
+
+    setError(null);
+    setAmount('');
+    onClose();
   }
 
   return (
@@ -78,6 +96,8 @@ export function AdjustStockModal({ visible, onClose, onSubmit }: AdjustStockModa
             placeholder="0"
             placeholderTextColor={colors.textSecondary}
           />
+
+          <ErrorBanner message={error} />
 
           <View style={styles.actions}>
             <Pressable style={styles.cancelButton} onPress={onClose}>

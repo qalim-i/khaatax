@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-
-import { logError, toUserMessage } from '@/lib/errors';
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import { supabase } from '@/lib/supabase';
-import type { AppUser } from '@/types/db';
+import type { UserRole } from '@/types/db';
 
 /**
  * The fixed staff list (1 owner + 2-3 managers), used to resolve `created_by`
@@ -13,28 +11,22 @@ import type { AppUser } from '@/types/db';
  * returns only the signed-in user.
  */
 export function useAppUsers() {
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refresh } = useAsyncData(
+    async () => {
+      const { data, error } = await supabase.from('users').select('*').order('name');
+      // Silently dropping this made every name resolve to 'Unknown' with no
+      // indication that the lookup had failed rather than come back empty.
+      if (error) throw error;
+      return data.map((row) => ({ ...row, role: row.role as UserRole }));
+    },
+    { fallbackMessage: 'Could not load the staff list.', context: 'useAppUsers' }
+  );
 
-  useEffect(() => {
-    supabase
-      .from('users')
-      .select('*')
-      .order('name')
-      .then(({ data, error: fetchError }) => {
-        // Silently dropping this made every name resolve to 'Unknown' with no
-        // indication that the lookup had failed rather than come back empty.
-        if (fetchError) logError('useAppUsers', fetchError);
-        setError(fetchError ? toUserMessage(fetchError, 'Could not load the staff list.') : null);
-        setUsers((data as AppUser[]) ?? []);
-        setLoading(false);
-      });
-  }, []);
+  const users = orEmpty(data);
 
   function nameFor(userId: string): string {
     return users.find((u) => u.id === userId)?.name ?? 'Unknown';
   }
 
-  return { users, loading, error, nameFor };
+  return { users, loading, error, refresh, nameFor };
 }

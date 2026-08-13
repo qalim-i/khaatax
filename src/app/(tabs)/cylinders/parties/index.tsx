@@ -15,7 +15,7 @@ import { formatCurrencyExact } from '@/lib/format';
 import type { PartyInput } from '@/types/db';
 
 export default function PartyLedgerScreen() {
-  const { rows, totals, loading, error, query, setQuery, refresh } = usePartyLedger();
+  const { rows, totals, initialLoading, error, query, setQuery, refresh } = usePartyLedger();
   const { create } = useCreateParty();
   const [formVisible, setFormVisible] = useState(false);
 
@@ -104,7 +104,7 @@ export default function PartyLedgerScreen() {
               </View>
             </View>
 
-            {loading ? <ActivityIndicator style={styles.loading} color={colors.primary} /> : null}
+            {initialLoading ? <ActivityIndicator style={styles.loading} color={colors.primary} /> : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -112,7 +112,7 @@ export default function PartyLedgerScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
-          !loading ? (
+          !initialLoading ? (
             <Text style={styles.emptyState}>
               {query.trim()
                 ? 'No parties match that search.'

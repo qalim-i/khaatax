@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
-import { summarisePayroll } from '@/lib/payroll';
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import { logError, toUserMessage } from '@/lib/errors';
+import { summarisePayroll } from '@/lib/payroll';
 import { supabase } from '@/lib/supabase';
-import type { Employee, EmployeeInput } from '@/types/db';
+import type { EmployeeInput } from '@/types/db';
 
 /**
  * Payroll CRUD (PRD PAY-1/PAY-2). Owner-only — every call here goes through the
@@ -16,76 +17,72 @@ import type { Employee, EmployeeInput } from '@/types/db';
  * cost totals while their record survives. Nothing here hard-deletes a row.
  */
 export function useEmployees() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  // Load failures are owned by useAsyncData; write failures are not, and the two
+  // are surfaced through one `error` because the screen has one place to show it.
+  const [writeError, setWriteError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error: fetchError } = await supabase.from('employees').select('*').order('name');
-    if (fetchError) {
-      logError('useEmployees.load', fetchError);
-      setError(toUserMessage(fetchError, 'Could not load the payroll list.'));
-    } else {
-      setError(null);
-      setEmployees((data as Employee[]) ?? []);
-    }
-    setLoading(false);
-  }, []);
+  const {
+    data,
+    loading,
+    initialLoading,
+    error: loadError,
+    refresh,
+  } = useAsyncData(
+    async () => {
+      const { data, error } = await supabase.from('employees').select('*').order('name');
+      if (error) throw error;
+      return data;
+    },
+    { fallbackMessage: 'Could not load the payroll list.', context: 'useEmployees' }
+  );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const employees = orEmpty(data);
 
-  const create = useCallback(
-    async (input: EmployeeInput) => {
-      const { error: insertError } = await supabase.from('employees').insert(input);
-      if (insertError) {
-        logError('useEmployees.create', insertError);
-        setError(toUserMessage(insertError, 'Could not add the employee.'));
+  const runWrite = useCallback(
+    async (context: string, fallback: string, write: () => PromiseLike<{ error: unknown }>) => {
+      const { error } = await write();
+      if (error) {
+        logError(context, error);
+        setWriteError(toUserMessage(error, fallback));
         return false;
       }
-      await load();
+      setWriteError(null);
+      await refresh();
       return true;
     },
-    [load]
+    [refresh]
+  );
+
+  const create = useCallback(
+    (input: EmployeeInput) =>
+      runWrite('useEmployees.create', 'Could not add the employee.', () =>
+        supabase.from('employees').insert(input)
+      ),
+    [runWrite]
   );
 
   const update = useCallback(
-    async (id: string, input: EmployeeInput) => {
-      const { error: updateError } = await supabase.from('employees').update(input).eq('id', id);
-      if (updateError) {
-        logError('useEmployees.update', updateError);
-        setError(toUserMessage(updateError, 'Could not save the employee.'));
-        return false;
-      }
-      await load();
-      return true;
-    },
-    [load]
+    (id: string, input: EmployeeInput) =>
+      runWrite('useEmployees.update', 'Could not save the employee.', () =>
+        supabase.from('employees').update(input).eq('id', id)
+      ),
+    [runWrite]
   );
 
   /** Soft delete / restore — see the note above on why this is not a DELETE. */
   const setActive = useCallback(
-    async (id: string, active: boolean) => {
-      const { error: updateError } = await supabase.from('employees').update({ active }).eq('id', id);
-      if (updateError) {
-        logError('useEmployees.setActive', updateError);
-        setError(toUserMessage(updateError, 'Could not update the employee.'));
-        return false;
-      }
-      await load();
-      return true;
-    },
-    [load]
+    (id: string, active: boolean) =>
+      runWrite('useEmployees.setActive', 'Could not update the employee.', () =>
+        supabase.from('employees').update({ active }).eq('id', id)
+      ),
+    [runWrite]
   );
 
   const summary = useMemo(() => summarisePayroll(employees), [employees]);
 
   const visibleEmployees = useMemo(
-    () =>
-      employees.filter((employee) => (showInactive ? true : employee.active)),
+    () => employees.filter((employee) => (showInactive ? true : employee.active)),
     [employees, showInactive]
   );
 
@@ -93,10 +90,11 @@ export function useEmployees() {
     employees: visibleEmployees,
     summary,
     loading,
-    error,
+    initialLoading,
+    error: loadError ?? writeError,
     showInactive,
     setShowInactive,
-    refresh: load,
+    refresh,
     create,
     update,
     setActive,

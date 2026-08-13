@@ -1,9 +1,9 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 
-import { logError } from '@/lib/errors';
+import { logError, looksLikeSessionFailure } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import type { AppUser } from '@/types/db';
+import type { AppUser, UserRole } from '@/types/db';
 
 interface AuthState {
   session: Session | null;
@@ -14,26 +14,13 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/**
- * True when a PostgREST error means "your token isn't valid", as opposed to a
- * policy denial or a missing row. RLS denials come back as empty result sets or
- * `42501`, never as 401/PGRST301 — so this must not fire on those, or a manager
- * hitting a table they can't read would get logged out.
- */
-function isAuthError(error: { code?: string; message?: string }): boolean {
-  return (
-    error.code === 'PGRST301' ||
-    error.code === '401' ||
-    /jwt|token/i.test(error.message ?? '')
-  );
-}
-
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Session bootstrap: reading persisted auth out of AsyncStorage.
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -47,6 +34,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let cancelled = false;
 
     if (!session) {
+      // Signed out: there is no profile to fetch, so the effect settles
+      // immediately rather than leaving `loading` true forever.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAppUser(null);
       setLoading(false);
       return;
@@ -69,7 +59,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           // app renders the full dashboard against a dead token: every query 401s
           // and every figure shows 0, which reads as "no data yet" rather than
           // "signed out". Drop to the sign-in screen instead.
-          if (isAuthError(error)) {
+          if (looksLikeSessionFailure(error)) {
             await supabase.auth.signOut({ scope: 'local' });
             // The await yields, so this effect may have been torn down while the
             // sign-out was in flight — a newer session, or an unmount. The entry
@@ -79,7 +69,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             setSession(null);
           }
         } else {
-          setAppUser(data as AppUser);
+          setAppUser({ ...data, role: data.role as UserRole });
         }
         setLoading(false);
       });

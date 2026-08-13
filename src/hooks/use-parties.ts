@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-
-import { logError, toUserMessage } from '@/lib/errors';
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import { supabase } from '@/lib/supabase';
-import type { Party } from '@/types/db';
 
 /**
  * The party list behind the New Transaction picker. Exposes `refresh` so a party
@@ -10,36 +7,14 @@ import type { Party } from '@/types/db';
  * app — callers pair this with `useRefreshOnFocus`.
  */
 export function useParties() {
-  const [parties, setParties] = useState<Party[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refresh } = useAsyncData(
+    async () => {
+      const { data, error } = await supabase.from('parties').select('*').order('name');
+      if (error) throw error;
+      return data;
+    },
+    { fallbackMessage: 'Could not load parties.', context: 'useParties' }
+  );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-
-    try {
-      const { data, error: fetchError } = await supabase.from('parties').select('*').order('name');
-      if (fetchError) {
-        logError('useParties', fetchError);
-        setError(toUserMessage(fetchError, 'Could not load parties.'));
-        setParties([]);
-        return;
-      }
-
-      setError(null);
-      setParties((data as Party[]) ?? []);
-    } catch (err) {
-      logError('useParties', err);
-      setError(toUserMessage(err, 'Could not load parties.'));
-      setParties([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return { parties, loading, error, refresh: load };
+  return { parties: orEmpty(data), loading, error, refresh };
 }

@@ -26,7 +26,7 @@ const PERIOD_CAPTION: Record<ExpensePeriod, string> = {
 };
 
 export default function ExpenseDashboardScreen() {
-  const { totals, byCategory, trend, period, setPeriod, periodStart, loading, error, refresh } =
+  const { totals, byCategory, trend, period, setPeriod, periodStart, loading, initialLoading, error, refresh } =
     useExpenseDashboard();
 
   useRefreshOnFocus(refresh);
@@ -62,22 +62,22 @@ export default function ExpenseDashboardScreen() {
           <View style={styles.headlineBlock}>
             <Text style={styles.headlineLabel}>{PERIOD_CAPTION[period].toUpperCase()}</Text>
             <Text style={styles.headlineValue}>
-              {loading ? '—' : formatCurrency(periodTotal)}
+              {initialLoading ? '—' : formatCurrency(periodTotal)}
             </Text>
           </View>
 
           <View style={styles.miniStatsRow}>
             <View style={styles.miniStat}>
               <Text style={styles.miniLabel}>TODAY</Text>
-              <Text style={styles.miniValue}>{loading ? '—' : formatCurrency(totals.today)}</Text>
+              <Text style={styles.miniValue}>{initialLoading ? '—' : formatCurrency(totals.today)}</Text>
             </View>
             <View style={[styles.miniStat, styles.miniStatBordered]}>
               <Text style={styles.miniLabel}>MTD</Text>
-              <Text style={styles.miniValue}>{loading ? '—' : formatCurrency(totals.mtd)}</Text>
+              <Text style={styles.miniValue}>{initialLoading ? '—' : formatCurrency(totals.mtd)}</Text>
             </View>
             <View style={[styles.miniStat, styles.miniStatBordered]}>
               <Text style={styles.miniLabel}>YTD</Text>
-              <Text style={styles.miniValue}>{loading ? '—' : formatCurrency(totals.ytd)}</Text>
+              <Text style={styles.miniValue}>{initialLoading ? '—' : formatCurrency(totals.ytd)}</Text>
             </View>
           </View>
 
@@ -97,7 +97,7 @@ export default function ExpenseDashboardScreen() {
             icon={<Icon name="wallet" width={22} height={16} color={colors.textPrimary} />}
             title="By Category"
           />
-          {loading ? (
+          {initialLoading ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
             <>
@@ -114,7 +114,11 @@ export default function ExpenseDashboardScreen() {
             icon={<Icon name="trend-arrow" width={18} height={16} color={colors.textPrimary} />}
             title="Monthly Trend"
           />
-          {loading ? <ActivityIndicator color={colors.primary} /> : <MonthlyTrendChart data={trend} />}
+          {initialLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <MonthlyTrendChart data={trend} />
+          )}
         </Card>
       </ScrollView>
     </View>

@@ -52,9 +52,17 @@ export default function PartyDetailScreen() {
   }
   // The export header should always target the most recently created transaction,
   // even if the list remains ordered by date for history display.
+  //
+  // `created_at` is nullable in the schema (`timestamptz default now()` with no
+  // NOT NULL), so a row written outside the app could carry none. Sorting such a
+  // row as the oldest is arbitrary but stable; `new Date(null)` is NaN, which
+  // loses every comparison it takes part in and would make the winner depend on
+  // list order instead.
+  const createdAtMs = (tx: Transaction) => (tx.created_at ? new Date(tx.created_at).getTime() : 0);
+
   const latestTransaction = transactions.reduce<Transaction | null>((latest, tx) => {
     if (!latest) return tx;
-    return new Date(tx.created_at).getTime() > new Date(latest.created_at).getTime() ? tx : latest;
+    return createdAtMs(tx) > createdAtMs(latest) ? tx : latest;
   }, null);
 
   function openExport(tx: Transaction) {

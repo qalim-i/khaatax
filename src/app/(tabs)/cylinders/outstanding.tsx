@@ -33,7 +33,7 @@ export default function OutstandingReportScreen() {
     setFilter,
     clearFilters,
     activeFilterCount,
-    loading,
+    initialLoading,
     error,
     refresh,
   } = useOutstanding();
@@ -73,16 +73,16 @@ export default function OutstandingReportScreen() {
               <View style={styles.summaryTile}>
                 <Text style={styles.summaryLabel}>CYLINDERS OUT</Text>
                 <Text style={[styles.summaryValue, { color: colors.danger }]}>
-                  {loading ? '—' : totals.cylinders}
+                  {initialLoading ? '—' : totals.cylinders}
                 </Text>
               </View>
               <View style={[styles.summaryTile, styles.summaryTileBordered]}>
                 <Text style={styles.summaryLabel}>PARTIES</Text>
-                <Text style={styles.summaryValue}>{loading ? '—' : totals.parties}</Text>
+                <Text style={styles.summaryValue}>{initialLoading ? '—' : totals.parties}</Text>
               </View>
               <View style={[styles.summaryTile, styles.summaryTileBordered]}>
                 <Text style={styles.summaryLabel}>OLDEST</Text>
-                <Text style={styles.summaryValue}>{loading ? '—' : `${totals.maxOverdueDays}d`}</Text>
+                <Text style={styles.summaryValue}>{initialLoading ? '—' : `${totals.maxOverdueDays}d`}</Text>
               </View>
             </View>
 
@@ -168,7 +168,7 @@ export default function OutstandingReportScreen() {
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {loading ? <ActivityIndicator color={colors.primary} /> : null}
+            {initialLoading ? <ActivityIndicator color={colors.primary} /> : null}
           </View>
         }
         renderItem={({ item }) => (
@@ -176,7 +176,7 @@ export default function OutstandingReportScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         ListEmptyComponent={
-          !loading ? (
+          !initialLoading ? (
             <Text style={styles.emptyState}>Nothing outstanding for these filters.</Text>
           ) : null
         }

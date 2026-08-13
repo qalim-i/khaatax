@@ -1,54 +1,65 @@
-import { useCallback, useEffect, useState } from 'react';
-
-import { logError, toUserMessage } from '@/lib/errors';
+import { useAsyncData } from '@/hooks/use-async-data';
 import { supabase } from '@/lib/supabase';
-import type { Party, Payment, Transaction } from '@/types/db';
+import type { Party, Payment, PaymentMethod, Transaction } from '@/types/db';
 
 export interface TransactionWithRunningBalance extends Transaction {
   runningBalance: number;
 }
 
 export function usePartyDetail(partyId: string) {
-  const [party, setParty] = useState<Party | null>(null);
-  const [transactions, setTransactions] = useState<TransactionWithRunningBalance[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data, loading, error, refresh } = useAsyncData<{
+    party: Party;
+    transactions: TransactionWithRunningBalance[];
+    payments: Payment[];
+  }>(
+    async () => {
       const [partyRes, txRes, payRes] = await Promise.all([
         supabase.from('parties').select('*').eq('id', partyId).single(),
-        supabase.from('transactions').select('*').eq('party_id', partyId).order('date', { ascending: true }).order('created_at', { ascending: true }),
+        supabase
+          .from('transactions')
+          .select('*')
+          .eq('party_id', partyId)
+          .order('date', { ascending: true })
+          .order('created_at', { ascending: true }),
         // Newest first: the payments list is a receipt history, read from the top.
-        supabase.from('payments').select('*').eq('party_id', partyId).order('date', { ascending: false }).order('created_at', { ascending: false }),
+        supabase
+          .from('payments')
+          .select('*')
+          .eq('party_id', partyId)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false }),
       ]);
       if (partyRes.error) throw partyRes.error;
       if (txRes.error) throw txRes.error;
       if (payRes.error) throw payRes.error;
 
       let running = 0;
-      const withBalance: TransactionWithRunningBalance[] = (txRes.data as Transaction[]).map((tx) => {
+      const withBalance: TransactionWithRunningBalance[] = txRes.data.map((tx) => {
         running += tx.filled_sent - tx.empty_received;
         return { ...tx, runningBalance: running };
       });
 
-      setParty(partyRes.data as Party);
-      setTransactions(withBalance.reverse());
-      setPayments((payRes.data as Payment[]) ?? []);
-      setError(null);
-    } catch (err) {
-      logError('usePartyDetail', err);
-      setError(toUserMessage(err, 'Could not load this party.'));
-    } finally {
-      setLoading(false);
+      return {
+        party: partyRes.data,
+        // Computed oldest-first so the running balance accumulates correctly,
+        // then reversed for display.
+        transactions: withBalance.reverse(),
+        payments: payRes.data.map((row) => ({ ...row, method: row.method as PaymentMethod })),
+      };
+    },
+    {
+      fallbackMessage: 'Could not load this party.',
+      context: 'usePartyDetail',
+      deps: [partyId],
     }
-  }, [partyId]);
+  );
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return { party, transactions, payments, loading, error, refresh: load };
+  return {
+    party: data?.party ?? null,
+    transactions: data?.transactions ?? [],
+    payments: data?.payments ?? [],
+    loading,
+    error,
+    refresh,
+  };
 }

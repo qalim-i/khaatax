@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import {
   formatMonthKey,
   monthKey,
@@ -8,7 +9,6 @@ import {
   startOfYearIso,
   toIsoDate,
 } from '@/lib/date';
-import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 
 const TREND_MONTHS = 12;
@@ -44,39 +44,28 @@ interface ExpenseRecord {
  * far cheaper than four round trips, and it keeps the period toggle instant.
  */
 export function useExpenseDashboard() {
-  const [records, setRecords] = useState<ExpenseRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<ExpensePeriod>('mtd');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const { data, loading, initialLoading, error, refresh } = useAsyncData<ExpenseRecord[]>(
+    async () => {
       const now = new Date();
       const windowStart =
         startOfYearIso(now) < startOfMonthsAgoIso(TREND_MONTHS - 1, now)
           ? startOfYearIso(now)
           : startOfMonthsAgoIso(TREND_MONTHS - 1, now);
 
-      const { data, error: queryError } = await supabase
+      const { data, error } = await supabase
         .from('expenses')
         .select('date, amount, category')
         .gte('date', windowStart);
 
-      if (queryError) throw queryError;
-      setRecords((data as ExpenseRecord[]) ?? []);
-    } catch (err) {
-      logError('useExpenseDashboard', err);
-      setError(toUserMessage(err, 'Could not load the expense dashboard.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (error) throw error;
+      return data;
+    },
+    { fallbackMessage: 'Could not load the expense dashboard.', context: 'useExpenseDashboard' }
+  );
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const records = orEmpty(data);
 
   const now = useMemo(() => new Date(), []);
 
@@ -144,7 +133,8 @@ export function useExpenseDashboard() {
     setPeriod,
     periodStart,
     loading,
+    initialLoading,
     error,
-    refresh: load,
+    refresh,
   };
 }

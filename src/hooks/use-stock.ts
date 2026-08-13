@@ -1,30 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
+import { orEmpty, useAsyncData } from '@/hooks/use-async-data';
 import { logError, toUserMessage } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
-import type { Stock, StockStatus } from '@/types/db';
+import type { StockStatus } from '@/types/db';
 
 export function useStock() {
-  const [rows, setRows] = useState<Stock[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refresh } = useAsyncData(
+    async () => {
+      const { data, error } = await supabase.from('stock').select('*');
+      if (error) throw error;
+      return data.map((row) => ({ ...row, status: row.status as StockStatus }));
+    },
+    { fallbackMessage: 'Could not load stock levels.', context: 'useStock' }
+  );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error: fetchError } = await supabase.from('stock').select('*');
-    if (fetchError) {
-      logError('useStock.load', fetchError);
-      setError(toUserMessage(fetchError, 'Could not load stock levels.'));
-    } else {
-      setError(null);
-      setRows(data as Stock[]);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const rows = orEmpty(data);
 
   /**
    * Applies a delta server-side via the `adjust_stock` RPC (migration 0007).
@@ -46,14 +37,13 @@ export function useStock() {
 
       if (rpcError) {
         logError('useStock.adjust', rpcError);
-        setError(toUserMessage(rpcError, 'Could not adjust stock.'));
-        return false;
+        return toUserMessage(rpcError, 'Could not adjust stock.');
       }
 
-      await load();
-      return true;
+      await refresh();
+      return null;
     },
-    [load]
+    [refresh]
   );
 
   const quantityOf = useCallback(
@@ -61,5 +51,5 @@ export function useStock() {
     [rows]
   );
 
-  return { rows, loading, error, refresh: load, adjust, quantityOf };
+  return { rows, loading, error, refresh, adjust, quantityOf };
 }
